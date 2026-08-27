@@ -10,7 +10,7 @@ export const FALLBACK_CATEGORIES: Category[] = [
   { id: 7, name: 'Crash Course Modules', slug: 'crash-course', description: '7-day fast-track high weightage chapter capsules for final exam crunch.', icon: 'clock', display_order: 7 },
 ];
 
-export const FALLBACK_NOTES: Note[] = [
+export let FALLBACK_NOTES: Note[] = [
   {
     id: 1,
     title: 'Human Physiology Master Handbook (All 7 Chapters)',
@@ -174,3 +174,15 @@ export const FALLBACK_NOTES: Note[] = [
     created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
   },
 ];
+
+export function getFallbackNotes(): Note[] {
+  return FALLBACK_NOTES;
+}
+
+export function removeFallbackNote(id: number): void {
+  FALLBACK_NOTES = FALLBACK_NOTES.filter(n => n.id !== id);
+}
+
+export function addFallbackNote(note: Note): void {
+  FALLBACK_NOTES.unshift(note);
+}

@@ -1,5 +1,5 @@
 import { Note, Category, User, Order, Review, Coupon, ContactMessage, RefundRequest, DashboardStats, SiteSettings } from '../types';
-import { FALLBACK_NOTES, FALLBACK_CATEGORIES } from '../data/fallbackData';
+import { FALLBACK_NOTES, FALLBACK_CATEGORIES, getFallbackNotes, removeFallbackNote, addFallbackNote } from '../data/fallbackData';
 
 const API_BASE = '/api';
 
@@ -111,7 +111,7 @@ export const api = {
     }
 
     // Fallback in-memory catalog
-    let filtered = [...FALLBACK_NOTES];
+    let filtered = [...getFallbackNotes()];
     if (params.subject && params.subject !== 'All') {
       filtered = filtered.filter(n => n.subject.toLowerCase() === params.subject.toLowerCase());
     }
@@ -420,7 +420,7 @@ export const api = {
       headers: getAuthHeaders(),
     });
     if (result && result.success) return result;
-    return { success: true, notes: FALLBACK_NOTES };
+    return { success: true, notes: getFallbackNotes() };
   },
 
   async createAdminNote(formData: FormData): Promise<any> {
@@ -458,10 +458,14 @@ export const api = {
   },
 
   async deleteAdminNote(id: number): Promise<any> {
-    return safeFetch(`${API_BASE}/admin/notes/${id}`, {
+    // Remove from client-side fallback list
+    removeFallbackNote(id);
+    const result = await safeFetch(`${API_BASE}/admin/notes/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
+    if (result && result.success !== undefined) return result;
+    return { success: true, message: 'Note deleted successfully.' };
   },
 
   async getAdminOrders(status?: string, search?: string): Promise<{ success: boolean; orders: Order[] }> {
