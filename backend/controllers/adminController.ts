@@ -279,6 +279,7 @@ export async function updateAdminNote(req: Request, res: Response) {
       is_bestseller,
       author_name,
       total_pages,
+      preview_pages,
       status,
       thumbnail_url,
     } = req.body;
@@ -303,6 +304,7 @@ export async function updateAdminNote(req: Request, res: Response) {
         if (is_bestseller !== undefined) { updateFields.push('is_bestseller = ?'); params.push(is_bestseller === '1' || is_bestseller === 'true' ? 1 : 0); }
         if (author_name) { updateFields.push('author_name = ?'); params.push(author_name); }
         if (total_pages) { updateFields.push('total_pages = ?'); params.push(parseInt(total_pages, 10)); }
+        if (preview_pages) { updateFields.push('preview_pages = ?'); params.push(parseInt(preview_pages, 10)); }
         if (status) { updateFields.push('status = ?'); params.push(status); }
 
         if (files?.['pdf_file']?.[0]) {
@@ -326,7 +328,8 @@ export async function updateAdminNote(req: Request, res: Response) {
           await pool.query(`UPDATE notes SET ${updateFields.join(', ')} WHERE id = ?`, params);
         }
 
-        return res.json({ success: true, message: 'Note updated successfully!' });
+        const [updatedRows]: any = await pool.query('SELECT * FROM notes WHERE id = ?', [noteId]);
+        return res.json({ success: true, message: 'Note updated successfully!', note: updatedRows[0] });
       }
     }
 
@@ -340,11 +343,12 @@ export async function updateAdminNote(req: Request, res: Response) {
     if (category_id !== undefined) note.category_id = parseInt(category_id, 10);
     if (price !== undefined) note.price = parseFloat(price);
     if (original_price !== undefined) note.original_price = parseFloat(original_price);
-    if (is_free !== undefined) note.is_free = is_free === '1' || is_free === 'true' ? 1 : 0;
-    if (is_featured !== undefined) note.is_featured = is_featured === '1' || is_featured === 'true' ? 1 : 0;
-    if (is_bestseller !== undefined) note.is_bestseller = is_bestseller === '1' || is_bestseller === 'true' ? 1 : 0;
+    if (is_free !== undefined) note.is_free = is_free === '1' || is_free === 'true' || is_free === 1 || is_free === true ? 1 : 0;
+    if (is_featured !== undefined) note.is_featured = is_featured === '1' || is_featured === 'true' || is_featured === 1 || is_featured === true ? 1 : 0;
+    if (is_bestseller !== undefined) note.is_bestseller = is_bestseller === '1' || is_bestseller === 'true' || is_bestseller === 1 || is_bestseller === true ? 1 : 0;
     if (author_name) note.author_name = author_name;
     if (total_pages) note.total_pages = parseInt(total_pages, 10);
+    if (preview_pages) note.preview_pages = parseInt(preview_pages, 10);
     if (status) note.status = status;
     if (thumbnail_url) note.thumbnail = thumbnail_url;
 

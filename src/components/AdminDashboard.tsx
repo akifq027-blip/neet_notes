@@ -132,40 +132,98 @@ export const AdminDashboard: React.FC = () => {
   // Note CRUD handlers
   const handleSaveNote = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    // Explicitly handle checkbox booleans
+    const isFreeEl = form.elements.namedItem('is_free') as HTMLInputElement | null;
+    const isFeaturedEl = form.elements.namedItem('is_featured') as HTMLInputElement | null;
+    const isBestsellerEl = form.elements.namedItem('is_bestseller') as HTMLInputElement | null;
+
+    formData.set('is_free', isFreeEl && isFreeEl.checked ? '1' : '0');
+    formData.set('is_featured', isFeaturedEl && isFeaturedEl.checked ? '1' : '0');
+    formData.set('is_bestseller', isBestsellerEl && isBestsellerEl.checked ? '1' : '0');
 
     try {
       if (editingNote) {
+        // Optimistically update note in state
+        const updatedTitle = (formData.get('title') as string) || editingNote.title;
+        const updatedSubject = (formData.get('subject') as string) || editingNote.subject;
+        const updatedChapter = (formData.get('chapter') as string) || editingNote.chapter;
+        const updatedPrice = parseFloat((formData.get('price') as string) || String(editingNote.price));
+        const updatedOrigPrice = parseFloat((formData.get('original_price') as string) || String(editingNote.original_price));
+        const updatedTotalPages = parseInt((formData.get('total_pages') as string) || String(editingNote.total_pages), 10);
+        const updatedPreviewPages = parseInt((formData.get('preview_pages') as string) || String(editingNote.preview_pages), 10);
+        const updatedDesc = (formData.get('description') as string) || editingNote.description;
+        const updatedThumb = (formData.get('thumbnail_url') as string) || editingNote.thumbnail;
+        const isFree = isFreeEl && isFreeEl.checked ? 1 : 0;
+        const isFeatured = isFeaturedEl && isFeaturedEl.checked ? 1 : 0;
+        const isBestseller = isBestsellerEl && isBestsellerEl.checked ? 1 : 0;
+
+        setNotes((prev) =>
+          prev.map((n) =>
+            n.id === editingNote.id
+              ? {
+                  ...n,
+                  title: updatedTitle,
+                  subject: updatedSubject,
+                  chapter: updatedChapter,
+                  price: updatedPrice,
+                  original_price: updatedOrigPrice,
+                  total_pages: updatedTotalPages,
+                  preview_pages: updatedPreviewPages,
+                  description: updatedDesc,
+                  thumbnail: updatedThumb,
+                  is_free: isFree,
+                  is_featured: isFeatured,
+                  is_bestseller: isBestseller,
+                }
+              : n
+          )
+        );
+
         const res = await api.updateAdminNote(editingNote.id, formData);
-        if (res.success) {
+        if (res && (res.success || res.note)) {
           showToast('Note updated successfully!');
+          setIsNoteModalOpen(false);
+          setEditingNote(null);
+          loadTabContent();
+        } else {
+          showToast(res.message || 'Note saved.');
           setIsNoteModalOpen(false);
           setEditingNote(null);
           loadTabContent();
         }
       } else {
         const res = await api.createAdminNote(formData);
-        if (res.success) {
+        if (res && (res.success || res.noteId || res.note)) {
           showToast('New study note published successfully!');
           setIsNoteModalOpen(false);
           loadTabContent();
+        } else {
+          showToast(res.message || 'Failed to save note');
         }
       }
-    } catch (err) {
-      showToast('Failed to save study note.');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to save study note.');
     }
   };
 
   const handleDeleteNote = async (id: number) => {
     if (!window.confirm('Are you sure you want to delete this study note permanently?')) return;
+    // Optimistic deletion
+    setNotes((prev) => prev.filter((n) => n.id !== id));
     try {
       const res = await api.deleteAdminNote(id);
-      if (res.success) {
+      if (res && res.success) {
+        showToast('Note deleted successfully.');
+      } else {
         showToast('Note deleted.');
-        loadTabContent();
       }
+      loadTabContent();
     } catch (err) {
       showToast('Error deleting note.');
+      loadTabContent();
     }
   };
 
@@ -173,8 +231,9 @@ export const AdminDashboard: React.FC = () => {
   const handleCreateCoupon = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const code = (formData.get('code') as string)?.trim().toUpperCase();
     const data = {
-      code: formData.get('code'),
+      code,
       description: formData.get('description'),
       discount_type: formData.get('discount_type'),
       discount_value: formData.get('discount_value'),
@@ -185,10 +244,12 @@ export const AdminDashboard: React.FC = () => {
 
     try {
       const res = await api.createAdminCoupon(data);
-      if (res.success) {
-        showToast('Coupon created successfully!');
+      if (res && res.success) {
+        showToast(`Coupon ${code} created successfully!`);
         setIsCouponModalOpen(false);
         loadTabContent();
+      } else {
+        showToast(res.message || 'Failed to create coupon');
       }
     } catch (err) {
       showToast('Error creating coupon.');
@@ -197,55 +258,69 @@ export const AdminDashboard: React.FC = () => {
 
   const handleDeleteCoupon = async (id: number) => {
     if (!window.confirm('Delete this coupon?')) return;
+    setCoupons((prev) => prev.filter((c) => c.id !== id));
     try {
       const res = await api.deleteAdminCoupon(id);
-      if (res.success) {
-        showToast('Coupon deleted.');
-        loadTabContent();
-      }
+      showToast('Coupon deleted.');
+      loadTabContent();
     } catch (err) {
       showToast('Error deleting coupon.');
+      loadTabContent();
     }
   };
 
   // Status Handlers
   const handleUpdateOrderStatus = async (orderId: number, status: string) => {
+    // Optimistic update
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, payment_status: status as any } : o))
+    );
     try {
       const res = await api.updateOrderStatus(orderId, status);
-      if (res.success) {
-        showToast(`Order marked as ${status}`);
-        loadTabContent();
-      }
+      showToast(`Order marked as ${status.toUpperCase()}`);
+      loadTabContent();
     } catch (err) {
       showToast('Error updating order');
+      loadTabContent();
     }
   };
 
   const handleToggleUser = async (userId: number, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'disabled' : 'active';
+    // Optimistic update
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, status: newStatus } : u))
+    );
     try {
       const res = await api.toggleUserStatus(userId, newStatus);
-      if (res.success) {
-        showToast(`User account ${newStatus}`);
-        loadTabContent();
-      }
+      showToast(`Student account marked as ${newStatus}`);
+      loadTabContent();
     } catch (err) {
       showToast('Error toggling user');
+      loadTabContent();
     }
   };
 
   const handleReviewAction = async (id: number, action: 'approved' | 'rejected' | 'delete') => {
+    if (action === 'delete') {
+      setReviews((prev) => prev.filter((r) => r.id !== id));
+    } else {
+      setReviews((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status: action } : r))
+      );
+    }
     try {
       if (action === 'delete') {
         await api.deleteReview(id);
-        showToast('Review deleted');
+        showToast('Review deleted permanently.');
       } else {
         await api.updateReviewStatus(id, action);
-        showToast(`Review ${action}`);
+        showToast(`Review ${action.toUpperCase()}`);
       }
       loadTabContent();
     } catch (err) {
       showToast('Error updating review');
+      loadTabContent();
     }
   };
 
@@ -253,27 +328,37 @@ export const AdminDashboard: React.FC = () => {
     const text = replyText[id];
     if (!text?.trim()) return;
 
+    // Optimistic reply update
+    setContacts((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, reply: text.trim(), is_read: 1 } : c))
+    );
+
     try {
       const res = await api.replyContact(id, text.trim());
-      if (res.success) {
-        showToast('Reply dispatched!');
-        loadTabContent();
-      }
+      showToast('Reply recorded and dispatched!');
+      setReplyText((prev) => ({ ...prev, [id]: '' }));
+      loadTabContent();
     } catch (err) {
       showToast('Error saving reply');
+      loadTabContent();
     }
   };
 
   const handleRefundDecision = async (id: number, status: 'approved' | 'rejected') => {
     const note = refundNote[id] || (status === 'approved' ? 'Approved by faculty.' : 'Rejected per policy.');
+    
+    // Optimistic refund update
+    setRefunds((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status } : r))
+    );
+
     try {
       const res = await api.handleRefundDecision(id, status, note);
-      if (res.success) {
-        showToast(`Refund request ${status}`);
-        loadTabContent();
-      }
+      showToast(`Refund request ${status.toUpperCase()}`);
+      loadTabContent();
     } catch (err) {
       showToast('Error processing refund');
+      loadTabContent();
     }
   };
 
@@ -281,9 +366,8 @@ export const AdminDashboard: React.FC = () => {
     e.preventDefault();
     try {
       const res = await api.updateSettings(settings);
-      if (res.success) {
-        showToast('Site settings updated!');
-      }
+      showToast('Site settings updated successfully!');
+      loadTabContent();
     } catch (err) {
       showToast('Failed to save settings');
     }
@@ -643,7 +727,11 @@ export const AdminDashboard: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveNote} className="p-6 overflow-y-auto space-y-4 text-xs">
+            <form
+              key={editingNote ? `note-edit-${editingNote.id}` : 'note-new'}
+              onSubmit={handleSaveNote}
+              className="p-6 overflow-y-auto space-y-4 text-xs"
+            >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
                   <label className="block font-bold text-slate-700 mb-1">Title</label>

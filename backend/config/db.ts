@@ -318,6 +318,45 @@ export async function initDatabase() {
     { id: 3, user_id: 2, note_id: 3, rating: 5, review: 'Every single reaction mechanism is explained so clearly. Best organic chemistry notes for NEET aspirants by far.', status: 'approved', created_at: new Date(Date.now() - 5 * 86400000).toISOString() },
   ];
 
+  memoryStore.contacts = [
+    {
+      id: 1,
+      name: 'Rohan Verma',
+      email: 'rohan.v@example.com',
+      phone: '+91 98765 22334',
+      subject: 'Inquiry regarding Biology Diagrams PDF printing',
+      message: 'Hello, can I print the high-res colored flowcharts for my personal revision wall at home? Thanks!',
+      reply: null,
+      is_read: 0,
+      created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+    },
+    {
+      id: 2,
+      name: 'Pooja Iyer',
+      email: 'pooja.iyer@example.com',
+      phone: '+91 98111 55667',
+      subject: 'NEET 2026 Botany Syllabus Coverage',
+      message: 'Does the Plant Physiology module include the latest NTA revised syllabus updates for 2026?',
+      reply: 'Yes! All modules are strictly aligned with the updated NMC/NTA NEET 2026 curriculum.',
+      is_read: 1,
+      replied_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+      created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    }
+  ];
+
+  memoryStore.refund_requests = [
+    {
+      id: 1,
+      user_id: 2,
+      order_id: 1,
+      note_id: 1,
+      reason: 'Accidentally bought the duplicate volume instead of Botany bundle. Requesting swap or refund.',
+      status: 'pending',
+      admin_note: null,
+      created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+    }
+  ];
+
   memoryStore.orders = [
     {
       id: 1,
