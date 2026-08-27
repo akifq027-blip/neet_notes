@@ -1,0 +1,6 @@
+{
+  "name": "NEET Notes Marketplace",
+  "description": "Full-stack educational marketplace for NEET aspirants to preview, purchase, and download high-yield study notes, question banks, PYQs, and revision materials.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
