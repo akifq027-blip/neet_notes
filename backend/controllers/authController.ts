@@ -37,6 +37,11 @@ export async function register(req: Request, res: Response) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const envAdminEmail = (process.env.ADMIN_EMAIL || 'admin@neetnotes.com').trim().toLowerCase();
+    const isSpecialAdmin =
+      cleanEmail === 'admin@neetnotes.com' ||
+      cleanEmail === 'akifq027@gmail.com' ||
+      cleanEmail === envAdminEmail;
 
     // Check if email already registered
     if (isMySQLConnected()) {
@@ -51,16 +56,17 @@ export async function register(req: Request, res: Response) {
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
+        const userRole = isSpecialAdmin ? 'admin' : 'student';
         const [result]: any = await pool.query(
           'INSERT INTO users (name, email, password_hash, role, phone, status) VALUES (?, ?, ?, ?, ?, ?)',
-          [name.trim(), cleanEmail, passwordHash, 'student', phone || null, 'active']
+          [name.trim(), cleanEmail, passwordHash, userRole, phone || null, 'active']
         );
 
         const newUser = {
           id: result.insertId,
           name: name.trim(),
           email: cleanEmail,
-          role: 'student' as const,
+          role: userRole as 'student' | 'admin',
         };
 
         const token = generateToken(newUser);
@@ -145,12 +151,38 @@ export async function login(req: Request, res: Response) {
       cleanEmail === 'akifq027@gmail.com' ||
       cleanEmail === envAdminEmail;
 
+    if (isSpecialAdmin && isMySQLConnected()) {
+      const pool = getPool();
+      if (pool) {
+        if (user) {
+          if (user.role !== 'admin') {
+            await pool.query('UPDATE users SET role = "admin" WHERE id = ?', [user.id]);
+            user.role = 'admin';
+          }
+        } else {
+          const adminPassHash = await bcrypt.hash(password || process.env.ADMIN_PASSWORD || 'Admin@12345', 10);
+          const [ins]: any = await pool.query(
+            'INSERT INTO users (name, email, password_hash, role, status) VALUES (?, ?, ?, "admin", "active")',
+            ['Faculty Administrator', cleanEmail, adminPassHash]
+          );
+          user = {
+            id: ins.insertId,
+            name: 'Faculty Administrator',
+            email: cleanEmail,
+            password_hash: adminPassHash,
+            role: 'admin',
+            status: 'active',
+          };
+        }
+      }
+    }
+
     if (!user && isSpecialAdmin) {
-      // Auto-create or resolve admin
+      // Auto-create or resolve admin in memory
       const adminPassHash = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'Admin@12345', 10);
       user = {
         id: 1,
-        name: 'NEET Notes Admin',
+        name: 'Faculty Administrator',
         email: cleanEmail,
         password_hash: adminPassHash,
         role: 'admin',

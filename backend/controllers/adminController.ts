@@ -134,7 +134,8 @@ export async function getAdminNotes(req: Request, res: Response) {
     });
 
     return res.json({ success: true, notes });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[Get Admin Notes Error]', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch admin notes' });
   }
 }
@@ -163,8 +164,16 @@ export async function createAdminNote(req: Request, res: Response) {
       return res.status(400).json({ success: false, message: 'Title, Subject, Chapter, and Description are required.' });
     }
 
+    // Normalize subject to match enum ('Physics', 'Chemistry', 'Biology', 'General NEET')
+    let safeSubject = 'General NEET';
+    const subLower = String(subject || '').toLowerCase();
+    if (subLower.includes('bio') || subLower.includes('botan') || subLower.includes('zool')) safeSubject = 'Biology';
+    else if (subLower.includes('chem') || subLower.includes('organ') || subLower.includes('inorgan')) safeSubject = 'Chemistry';
+    else if (subLower.includes('phys')) safeSubject = 'Physics';
+    else if (['Physics', 'Chemistry', 'Biology', 'General NEET'].includes(subject)) safeSubject = subject;
+
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
-    const pdfFilename = files?.['pdf_file']?.[0]?.filename || 'sample-note.pdf';
+    const pdfFilename = files?.['pdf_file']?.[0]?.filename || 'sample-handbook.pdf';
     const previewFilename = files?.['preview_file']?.[0]?.filename || null;
     const thumbFilename = files?.['thumbnail']?.[0]?.filename
       ? `/backend/uploads/thumbnails/${files['thumbnail'][0].filename}`
@@ -175,15 +184,32 @@ export async function createAdminNote(req: Request, res: Response) {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') + '-' + Math.floor(100 + Math.random() * 900);
 
-    const priceNum = parseFloat(price || '0');
-    const origPriceNum = parseFloat(original_price || price || '0');
-    const isFreeVal = is_free === '1' || is_free === 'true' || priceNum === 0 ? 1 : 0;
-    const isFeaturedVal = is_featured === '1' || is_featured === 'true' ? 1 : 0;
-    const isBestsellerVal = is_bestseller === '1' || is_bestseller === 'true' ? 1 : 0;
+    const priceNum = isNaN(parseFloat(price)) ? 0 : parseFloat(price);
+    const origPriceNum = isNaN(parseFloat(original_price)) ? priceNum : parseFloat(original_price);
+    const isFreeVal = is_free === '1' || is_free === 'true' || is_free === 1 || is_free === true || priceNum === 0 ? 1 : 0;
+    const isFeaturedVal = is_featured === '1' || is_featured === 'true' || is_featured === 1 || is_featured === true ? 1 : 0;
+    const isBestsellerVal = is_bestseller === '1' || is_bestseller === 'true' || is_bestseller === 1 || is_bestseller === true ? 1 : 0;
+    const safeTotalPages = parseInt(total_pages, 10) || 35;
+    const safePreviewPages = parseInt(preview_pages, 10) || 4;
+    const safeAuthor = author_name?.trim() || 'Dr. AIIMS NEET Faculty';
+    const safeStatus = status || 'published';
+
+    let safeCategoryId: number | null = null;
+    if (category_id && !isNaN(parseInt(category_id, 10))) {
+      safeCategoryId = parseInt(category_id, 10);
+    }
 
     if (isMySQLConnected()) {
       const pool = getPool();
       if (pool) {
+        // Validate category exists in categories table to satisfy foreign key
+        if (safeCategoryId) {
+          const [catRows]: any = await pool.query('SELECT id FROM categories WHERE id = ?', [safeCategoryId]);
+          if (catRows.length === 0) {
+            safeCategoryId = null;
+          }
+        }
+
         const [result]: any = await pool.query(
           `INSERT INTO notes (
             title, slug, description, subject, chapter, category_id,
@@ -195,28 +221,66 @@ export async function createAdminNote(req: Request, res: Response) {
             title.trim(),
             slug,
             description.trim(),
-            subject,
+            safeSubject,
             chapter.trim(),
-            category_id ? parseInt(category_id, 10) : null,
+            safeCategoryId,
             priceNum,
             origPriceNum,
             thumbFilename,
             pdfFilename,
             previewFilename,
-            preview_pages ? parseInt(preview_pages, 10) : 4,
-            total_pages ? parseInt(total_pages, 10) : 35,
+            safePreviewPages,
+            safeTotalPages,
             isFreeVal,
             isFeaturedVal,
             isBestsellerVal,
-            author_name || 'Dr. AIIMS NEET Faculty',
-            status || 'published',
+            safeAuthor,
+            safeStatus,
           ]
         );
 
+        const newId = result.insertId;
+        const [createdRows]: any = await pool.query(
+          'SELECT n.*, c.name as category_name FROM notes n LEFT JOIN categories c ON n.category_id = c.id WHERE n.id = ?',
+          [newId]
+        );
+
+        const createdNote = createdRows[0] || {
+          id: newId,
+          title: title.trim(),
+          slug,
+          description: description.trim(),
+          subject: safeSubject,
+          chapter: chapter.trim(),
+          category_id: safeCategoryId,
+          price: priceNum,
+          original_price: origPriceNum,
+          thumbnail: thumbFilename,
+          pdf_file: pdfFilename,
+          preview_file: previewFilename,
+          preview_pages: safePreviewPages,
+          total_pages: safeTotalPages,
+          file_size_mb: 4.5,
+          is_free: isFreeVal,
+          is_featured: isFeaturedVal,
+          is_bestseller: isBestsellerVal,
+          author_name: safeAuthor,
+          rating_avg: 5.0,
+          rating_count: 1,
+          purchase_count: 0,
+          download_count: 0,
+          status: safeStatus,
+          created_at: new Date().toISOString(),
+        };
+
+        memoryStore.notes.unshift(createdNote);
+
+        console.log(`[Admin] Successfully created note #${newId} (${title.trim()}) in MySQL.`);
         return res.status(201).json({
           success: true,
-          message: 'Study note uploaded and published successfully!',
-          noteId: result.insertId,
+          message: 'Study note uploaded and published successfully in database!',
+          noteId: newId,
+          note: createdNote,
         });
       }
     }
@@ -227,26 +291,26 @@ export async function createAdminNote(req: Request, res: Response) {
       title: title.trim(),
       slug,
       description: description.trim(),
-      subject,
+      subject: safeSubject,
       chapter: chapter.trim(),
-      category_id: category_id ? parseInt(category_id, 10) : 1,
+      category_id: safeCategoryId || 1,
       price: priceNum,
       original_price: origPriceNum,
       thumbnail: thumbFilename,
       pdf_file: pdfFilename,
       preview_file: previewFilename,
-      preview_pages: preview_pages ? parseInt(preview_pages, 10) : 4,
-      total_pages: total_pages ? parseInt(total_pages, 10) : 35,
+      preview_pages: safePreviewPages,
+      total_pages: safeTotalPages,
       file_size_mb: 4.5,
       is_free: isFreeVal,
       is_featured: isFeaturedVal,
       is_bestseller: isBestsellerVal,
-      author_name: author_name || 'Dr. AIIMS NEET Faculty',
+      author_name: safeAuthor,
       rating_avg: 5.0,
       rating_count: 1,
       purchase_count: 0,
       download_count: 0,
-      status: status || 'published',
+      status: safeStatus,
       created_at: new Date().toISOString(),
     };
 
@@ -259,7 +323,7 @@ export async function createAdminNote(req: Request, res: Response) {
     });
   } catch (error: any) {
     console.error('[Create Note Error]', error);
-    return res.status(500).json({ success: false, message: 'Failed to create note' });
+    return res.status(500).json({ success: false, message: `Failed to create note: ${error.message || 'Database error'}` });
   }
 }
 
@@ -294,17 +358,35 @@ export async function updateAdminNote(req: Request, res: Response) {
 
         if (title) { updateFields.push('title = ?'); params.push(title.trim()); }
         if (description) { updateFields.push('description = ?'); params.push(description.trim()); }
-        if (subject) { updateFields.push('subject = ?'); params.push(subject); }
+        if (subject) {
+          let safeSubject = subject;
+          const subLower = String(subject).toLowerCase();
+          if (subLower.includes('bio')) safeSubject = 'Biology';
+          else if (subLower.includes('chem')) safeSubject = 'Chemistry';
+          else if (subLower.includes('phys')) safeSubject = 'Physics';
+          else if (['Physics', 'Chemistry', 'Biology', 'General NEET'].includes(subject)) safeSubject = subject;
+          updateFields.push('subject = ?');
+          params.push(safeSubject);
+        }
         if (chapter) { updateFields.push('chapter = ?'); params.push(chapter.trim()); }
-        if (category_id !== undefined) { updateFields.push('category_id = ?'); params.push(parseInt(category_id, 10) || null); }
-        if (price !== undefined) { updateFields.push('price = ?'); params.push(parseFloat(price)); }
-        if (original_price !== undefined) { updateFields.push('original_price = ?'); params.push(parseFloat(original_price)); }
-        if (is_free !== undefined) { updateFields.push('is_free = ?'); params.push(is_free === '1' || is_free === 'true' ? 1 : 0); }
-        if (is_featured !== undefined) { updateFields.push('is_featured = ?'); params.push(is_featured === '1' || is_featured === 'true' ? 1 : 0); }
-        if (is_bestseller !== undefined) { updateFields.push('is_bestseller = ?'); params.push(is_bestseller === '1' || is_bestseller === 'true' ? 1 : 0); }
-        if (author_name) { updateFields.push('author_name = ?'); params.push(author_name); }
-        if (total_pages) { updateFields.push('total_pages = ?'); params.push(parseInt(total_pages, 10)); }
-        if (preview_pages) { updateFields.push('preview_pages = ?'); params.push(parseInt(preview_pages, 10)); }
+        if (category_id !== undefined) {
+          const parsedCat = parseInt(category_id, 10);
+          let safeCat: number | null = null;
+          if (!isNaN(parsedCat)) {
+            const [catCheck]: any = await pool.query('SELECT id FROM categories WHERE id = ?', [parsedCat]);
+            if (catCheck.length > 0) safeCat = parsedCat;
+          }
+          updateFields.push('category_id = ?');
+          params.push(safeCat);
+        }
+        if (price !== undefined) { updateFields.push('price = ?'); params.push(parseFloat(price) || 0); }
+        if (original_price !== undefined) { updateFields.push('original_price = ?'); params.push(parseFloat(original_price) || 0); }
+        if (is_free !== undefined) { updateFields.push('is_free = ?'); params.push(is_free === '1' || is_free === 'true' || is_free === 1 || is_free === true ? 1 : 0); }
+        if (is_featured !== undefined) { updateFields.push('is_featured = ?'); params.push(is_featured === '1' || is_featured === 'true' || is_featured === 1 || is_featured === true ? 1 : 0); }
+        if (is_bestseller !== undefined) { updateFields.push('is_bestseller = ?'); params.push(is_bestseller === '1' || is_bestseller === 'true' || is_bestseller === 1 || is_bestseller === true ? 1 : 0); }
+        if (author_name) { updateFields.push('author_name = ?'); params.push(author_name.trim()); }
+        if (total_pages) { updateFields.push('total_pages = ?'); params.push(parseInt(total_pages, 10) || 35); }
+        if (preview_pages) { updateFields.push('preview_pages = ?'); params.push(parseInt(preview_pages, 10) || 4); }
         if (status) { updateFields.push('status = ?'); params.push(status); }
 
         if (files?.['pdf_file']?.[0]) {
@@ -328,8 +410,19 @@ export async function updateAdminNote(req: Request, res: Response) {
           await pool.query(`UPDATE notes SET ${updateFields.join(', ')} WHERE id = ?`, params);
         }
 
-        const [updatedRows]: any = await pool.query('SELECT * FROM notes WHERE id = ?', [noteId]);
-        return res.json({ success: true, message: 'Note updated successfully!', note: updatedRows[0] });
+        const [updatedRows]: any = await pool.query(
+          'SELECT n.*, c.name as category_name FROM notes n LEFT JOIN categories c ON n.category_id = c.id WHERE n.id = ?',
+          [noteId]
+        );
+
+        const updatedNote = updatedRows[0];
+        const memIdx = memoryStore.notes.findIndex(n => n.id === noteId);
+        if (memIdx >= 0 && updatedNote) {
+          memoryStore.notes[memIdx] = { ...memoryStore.notes[memIdx], ...updatedNote };
+        }
+
+        console.log(`[Admin] Successfully updated note #${noteId} in MySQL.`);
+        return res.json({ success: true, message: 'Note updated successfully in database!', note: updatedNote });
       }
     }
 
@@ -340,7 +433,7 @@ export async function updateAdminNote(req: Request, res: Response) {
     if (description) note.description = description.trim();
     if (subject) note.subject = subject;
     if (chapter) note.chapter = chapter.trim();
-    if (category_id !== undefined) note.category_id = parseInt(category_id, 10);
+    if (category_id !== undefined) note.category_id = parseInt(category_id, 10) || 1;
     if (price !== undefined) note.price = parseFloat(price);
     if (original_price !== undefined) note.original_price = parseFloat(original_price);
     if (is_free !== undefined) note.is_free = is_free === '1' || is_free === 'true' || is_free === 1 || is_free === true ? 1 : 0;
@@ -357,8 +450,9 @@ export async function updateAdminNote(req: Request, res: Response) {
     if (files?.['thumbnail']?.[0]) note.thumbnail = `/backend/uploads/thumbnails/${files['thumbnail'][0].filename}`;
 
     return res.json({ success: true, message: 'Note updated successfully!', note });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to update note' });
+  } catch (error: any) {
+    console.error('[Update Note Error]', error);
+    return res.status(500).json({ success: false, message: `Failed to update note: ${error.message || 'Database error'}` });
   }
 }
 
@@ -369,8 +463,15 @@ export async function deleteAdminNote(req: Request, res: Response) {
     if (isMySQLConnected()) {
       const pool = getPool();
       if (pool) {
+        // Clean up child dependencies safely if not handled by foreign key cascade
+        try { await pool.query('DELETE FROM order_items WHERE note_id = ?', [noteId]); } catch (e) {}
+        try { await pool.query('DELETE FROM reviews WHERE note_id = ?', [noteId]); } catch (e) {}
+        try { await pool.query('DELETE FROM downloads WHERE note_id = ?', [noteId]); } catch (e) {}
+        try { await pool.query('DELETE FROM wishlist WHERE note_id = ?', [noteId]); } catch (e) {}
+        try { await pool.query('DELETE FROM refund_requests WHERE note_id = ?', [noteId]); } catch (e) {}
+
         await pool.query('DELETE FROM notes WHERE id = ?', [noteId]);
-        return res.json({ success: true, message: 'Note deleted permanently.' });
+        console.log(`[Admin] Successfully deleted note #${noteId} from MySQL.`);
       }
     }
 
@@ -379,9 +480,10 @@ export async function deleteAdminNote(req: Request, res: Response) {
       memoryStore.notes.splice(idx, 1);
     }
 
-    return res.json({ success: true, message: 'Note deleted successfully.' });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to delete note' });
+    return res.json({ success: true, message: 'Note deleted permanently from database.' });
+  } catch (error: any) {
+    console.error('[Delete Note Error]', error);
+    return res.status(500).json({ success: false, message: `Failed to delete note: ${error.message || 'Database error'}` });
   }
 }
 
@@ -533,10 +635,10 @@ export async function getAdminReviews(req: Request, res: Response) {
       const pool = getPool();
       if (pool) {
         const [reviews]: any = await pool.query(
-          `SELECT r.*, u.name as user_name, u.email as user_email, n.title as note_title
+          `SELECT r.*, COALESCE(u.name, 'Student') as user_name, COALESCE(u.email, '') as user_email, COALESCE(n.title, 'Study Note') as note_title
            FROM reviews r
-           JOIN users u ON r.user_id = u.id
-           JOIN notes n ON r.note_id = n.id
+           LEFT JOIN users u ON r.user_id = u.id
+           LEFT JOIN notes n ON r.note_id = n.id
            ORDER BY r.created_at DESC`
         );
         return res.json({ success: true, reviews });
@@ -555,7 +657,8 @@ export async function getAdminReviews(req: Request, res: Response) {
     });
 
     return res.json({ success: true, reviews });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[Get Admin Reviews Error]', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch reviews' });
   }
 }
@@ -634,7 +737,8 @@ export async function createAdminCoupon(req: Request, res: Response) {
       if (pool) {
         await pool.query(
           `INSERT INTO coupons (code, description, discount_type, discount_value, minimum_amount, usage_limit, expiry_date, active)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+           ON DUPLICATE KEY UPDATE description = VALUES(description), discount_type = VALUES(discount_type), discount_value = VALUES(discount_value), minimum_amount = VALUES(minimum_amount), usage_limit = VALUES(usage_limit), expiry_date = VALUES(expiry_date), active = 1`,
           [
             cleanCode,
             description || '',
@@ -645,7 +749,7 @@ export async function createAdminCoupon(req: Request, res: Response) {
             expiry_date || null,
           ]
         );
-        return res.status(201).json({ success: true, message: 'Coupon created successfully!' });
+        return res.status(201).json({ success: true, message: 'Coupon saved successfully!' });
       }
     }
 
@@ -665,8 +769,9 @@ export async function createAdminCoupon(req: Request, res: Response) {
     memoryStore.coupons.unshift(newCoupon);
 
     return res.status(201).json({ success: true, message: 'Coupon created successfully!', coupon: newCoupon });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to create coupon' });
+  } catch (error: any) {
+    console.error('[Create Coupon Error]', error);
+    return res.status(500).json({ success: false, message: `Failed to create coupon: ${error.message || 'Error'}` });
   }
 }
 
@@ -736,11 +841,11 @@ export async function getAdminRefunds(req: Request, res: Response) {
       const pool = getPool();
       if (pool) {
         const [rows]: any = await pool.query(
-          `SELECT rr.*, u.name as user_name, u.email as user_email, o.order_number, n.title as note_title, o.total_amount
+          `SELECT rr.*, COALESCE(u.name, 'Student') as user_name, COALESCE(u.email, '') as user_email, COALESCE(o.order_number, 'ORD-N/A') as order_number, COALESCE(n.title, 'Study Note') as note_title, COALESCE(o.total_amount, 0) as total_amount
            FROM refund_requests rr
-           JOIN users u ON rr.user_id = u.id
-           JOIN orders o ON rr.order_id = o.id
-           JOIN notes n ON rr.note_id = n.id
+           LEFT JOIN users u ON rr.user_id = u.id
+           LEFT JOIN orders o ON rr.order_id = o.id
+           LEFT JOIN notes n ON rr.note_id = n.id
            ORDER BY rr.created_at DESC`
         );
         return res.json({ success: true, refunds: rows });
@@ -762,7 +867,8 @@ export async function getAdminRefunds(req: Request, res: Response) {
     });
 
     return res.json({ success: true, refunds });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[Get Admin Refunds Error]', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch refunds' });
   }
 }
@@ -801,7 +907,8 @@ export async function handleRefundDecision(req: Request, res: Response) {
     }
 
     return res.json({ success: true, message: `Refund request ${status}.` });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[Refund Decision Error]', error);
     return res.status(500).json({ success: false, message: 'Failed to process refund' });
   }
 }
@@ -819,7 +926,8 @@ export async function getSettings(req: Request, res: Response) {
       }
     }
     return res.json({ success: true, settings: memoryStore.site_settings });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[Get Settings Error]', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch settings' });
   }
 }
@@ -838,12 +946,15 @@ export async function updateSettings(req: Request, res: Response) {
           );
         }
       }
-    } else if (settings) {
+    }
+    
+    if (settings) {
       Object.assign(memoryStore.site_settings, settings);
     }
 
     return res.json({ success: true, message: 'Site configuration updated successfully.' });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[Update Settings Error]', error);
     return res.status(500).json({ success: false, message: 'Failed to update settings' });
   }
 }

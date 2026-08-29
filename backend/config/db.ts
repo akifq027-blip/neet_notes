@@ -445,25 +445,291 @@ export async function initDatabase() {
 async function syncSchemaIfNeeded() {
   if (!pool) return;
   try {
-    const [rows]: any = await pool.query("SHOW TABLES LIKE 'notes'");
-    if (rows.length === 0) {
-      console.log('[Database] Initializing MySQL tables from schema.sql...');
-      const schemaPath = path.join(process.cwd(), 'database', 'schema.sql');
-      if (fs.existsSync(schemaPath)) {
-        const sql = fs.readFileSync(schemaPath, 'utf-8');
-        const statements = sql
-          .split(';')
-          .map(s => s.trim())
-          .filter(s => s.length > 0);
+    // 1. Users table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`users\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`name\` VARCHAR(100) NOT NULL,
+        \`email\` VARCHAR(191) NOT NULL UNIQUE,
+        \`password_hash\` VARCHAR(255) NOT NULL,
+        \`role\` ENUM('student', 'admin') NOT NULL DEFAULT 'student',
+        \`avatar\` VARCHAR(255) DEFAULT NULL,
+        \`phone\` VARCHAR(20) DEFAULT NULL,
+        \`status\` ENUM('active', 'disabled') NOT NULL DEFAULT 'active',
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX \`idx_users_email\` (\`email\`),
+        INDEX \`idx_users_role\` (\`role\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
 
-        for (const statement of statements) {
-          try {
-            await pool.query(statement);
-          } catch (e: any) {}
-        }
-        console.log('[Database] MySQL tables created successfully.');
+    // 2. Categories table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`categories\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`name\` VARCHAR(100) NOT NULL UNIQUE,
+        \`slug\` VARCHAR(100) NOT NULL UNIQUE,
+        \`description\` TEXT DEFAULT NULL,
+        \`icon\` VARCHAR(50) DEFAULT 'book-open',
+        \`display_order\` INT DEFAULT 0,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 3. Notes table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`notes\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`title\` VARCHAR(255) NOT NULL,
+        \`slug\` VARCHAR(255) NOT NULL,
+        \`description\` TEXT NOT NULL,
+        \`subject\` ENUM('Physics', 'Chemistry', 'Biology', 'General NEET') NOT NULL,
+        \`chapter\` VARCHAR(150) NOT NULL,
+        \`category_id\` INT UNSIGNED DEFAULT NULL,
+        \`price\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        \`original_price\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        \`thumbnail\` VARCHAR(255) DEFAULT NULL,
+        \`pdf_file\` VARCHAR(255) NOT NULL,
+        \`preview_file\` VARCHAR(255) DEFAULT NULL,
+        \`preview_pages\` INT DEFAULT 3,
+        \`total_pages\` INT DEFAULT 20,
+        \`file_size_mb\` DECIMAL(5, 2) DEFAULT 4.50,
+        \`is_free\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`is_featured\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`is_bestseller\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`author_name\` VARCHAR(100) DEFAULT 'Dr. AIIMS NEET Faculty',
+        \`rating_avg\` DECIMAL(3, 2) DEFAULT 5.00,
+        \`rating_count\` INT UNSIGNED DEFAULT 0,
+        \`purchase_count\` INT UNSIGNED DEFAULT 0,
+        \`download_count\` INT UNSIGNED DEFAULT 0,
+        \`status\` ENUM('published', 'draft', 'archived') NOT NULL DEFAULT 'published',
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX \`idx_notes_subject\` (\`subject\`),
+        INDEX \`idx_notes_chapter\` (\`chapter\`),
+        INDEX \`idx_notes_price\` (\`price\`),
+        INDEX \`idx_notes_is_free\` (\`is_free\`),
+        INDEX \`idx_notes_status\` (\`status\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 4. Orders table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`orders\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`order_number\` VARCHAR(50) NOT NULL UNIQUE,
+        \`user_id\` INT UNSIGNED NOT NULL,
+        \`subtotal\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        \`discount_amount\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        \`coupon_code\` VARCHAR(50) DEFAULT NULL,
+        \`total_amount\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        \`payment_status\` ENUM('pending', 'paid', 'failed', 'refunded') NOT NULL DEFAULT 'pending',
+        \`payment_method\` VARCHAR(50) DEFAULT 'razorpay',
+        \`razorpay_order_id\` VARCHAR(100) DEFAULT NULL,
+        \`razorpay_payment_id\` VARCHAR(100) DEFAULT NULL,
+        \`razorpay_signature\` VARCHAR(255) DEFAULT NULL,
+        \`customer_name\` VARCHAR(100) DEFAULT NULL,
+        \`customer_email\` VARCHAR(191) DEFAULT NULL,
+        \`customer_phone\` VARCHAR(20) DEFAULT NULL,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX \`idx_orders_user_id\` (\`user_id\`),
+        INDEX \`idx_orders_payment_status\` (\`payment_status\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 5. Order items
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`order_items\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`order_id\` INT UNSIGNED NOT NULL,
+        \`note_id\` INT UNSIGNED NOT NULL,
+        \`price\` DECIMAL(10, 2) NOT NULL,
+        \`note_title\` VARCHAR(255) NOT NULL,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX \`idx_order_items_order_id\` (\`order_id\`),
+        INDEX \`idx_order_items_note_id\` (\`note_id\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 6. Downloads table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`downloads\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`user_id\` INT UNSIGNED NOT NULL,
+        \`note_id\` INT UNSIGNED NOT NULL,
+        \`order_id\` INT UNSIGNED DEFAULT NULL,
+        \`ip_address\` VARCHAR(45) DEFAULT NULL,
+        \`user_agent\` VARCHAR(255) DEFAULT NULL,
+        \`downloaded_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX \`idx_downloads_user_note\` (\`user_id\`, \`note_id\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 7. Reviews table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`reviews\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`user_id\` INT UNSIGNED NOT NULL,
+        \`note_id\` INT UNSIGNED NOT NULL,
+        \`rating\` TINYINT UNSIGNED NOT NULL,
+        \`review\` TEXT NOT NULL,
+        \`status\` ENUM('approved', 'pending', 'rejected') NOT NULL DEFAULT 'approved',
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX \`idx_reviews_note_id\` (\`note_id\`),
+        INDEX \`idx_reviews_rating\` (\`rating\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 8. Coupons table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`coupons\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`code\` VARCHAR(50) NOT NULL UNIQUE,
+        \`description\` VARCHAR(255) DEFAULT NULL,
+        \`discount_type\` ENUM('percentage', 'fixed') NOT NULL DEFAULT 'percentage',
+        \`discount_value\` DECIMAL(10, 2) NOT NULL,
+        \`minimum_amount\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        \`usage_limit\` INT UNSIGNED DEFAULT 500,
+        \`times_used\` INT UNSIGNED DEFAULT 0,
+        \`expiry_date\` DATE DEFAULT NULL,
+        \`active\` TINYINT(1) NOT NULL DEFAULT 1,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX \`idx_coupons_code\` (\`code\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 9. Contacts table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`contacts\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`name\` VARCHAR(100) NOT NULL,
+        \`email\` VARCHAR(191) NOT NULL,
+        \`subject\` VARCHAR(200) NOT NULL,
+        \`message\` TEXT NOT NULL,
+        \`reply\` TEXT DEFAULT NULL,
+        \`is_read\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`replied_at\` TIMESTAMP NULL DEFAULT NULL,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 10. Refund requests
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`refund_requests\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`user_id\` INT UNSIGNED NOT NULL,
+        \`order_id\` INT UNSIGNED NOT NULL,
+        \`note_id\` INT UNSIGNED NOT NULL,
+        \`reason\` TEXT NOT NULL,
+        \`status\` ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending',
+        \`admin_note\` TEXT DEFAULT NULL,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 11. Wishlist table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`wishlist\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`user_id\` INT UNSIGNED NOT NULL,
+        \`note_id\` INT UNSIGNED NOT NULL,
+        \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY \`unique_user_note_wishlist\` (\`user_id\`, \`note_id\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 12. Site settings
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS \`site_settings\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`key_name\` VARCHAR(100) NOT NULL UNIQUE,
+        \`key_value\` LONGTEXT NOT NULL,
+        \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // Seed default categories if empty
+    const [catRows]: any = await pool.query('SELECT COUNT(*) as count FROM categories');
+    if (catRows[0]?.count === 0) {
+      console.log('[Database] Seeding default categories in MySQL...');
+      for (const cat of memoryStore.categories) {
+        await pool.query(
+          'INSERT INTO categories (id, name, slug, description, icon, display_order) VALUES (?, ?, ?, ?, ?, ?)',
+          [cat.id, cat.name, cat.slug, cat.description, cat.icon, cat.display_order]
+        );
       }
     }
+
+    // Seed default notes if empty
+    const [noteRows]: any = await pool.query('SELECT COUNT(*) as count FROM notes');
+    if (noteRows[0]?.count === 0) {
+      console.log('[Database] Seeding default high-yield notes in MySQL...');
+      for (const note of memoryStore.notes) {
+        await pool.query(
+          `INSERT INTO notes (
+            id, title, slug, description, subject, chapter, category_id, price, original_price,
+            thumbnail, pdf_file, preview_file, preview_pages, total_pages, file_size_mb,
+            is_free, is_featured, is_bestseller, author_name, rating_avg, rating_count, purchase_count, download_count, status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            note.id, note.title, note.slug, note.description, note.subject, note.chapter, note.category_id,
+            note.price, note.original_price, note.thumbnail, note.pdf_file, note.preview_file,
+            note.preview_pages, note.total_pages, note.file_size_mb, note.is_free, note.is_featured,
+            note.is_bestseller, note.author_name, note.rating_avg, note.rating_count,
+            note.purchase_count, note.download_count, note.status,
+          ]
+        );
+      }
+    }
+
+    // Seed coupons if empty
+    const [couponRows]: any = await pool.query('SELECT COUNT(*) as count FROM coupons');
+    if (couponRows[0]?.count === 0) {
+      console.log('[Database] Seeding default coupons in MySQL...');
+      for (const c of memoryStore.coupons) {
+        await pool.query(
+          'INSERT INTO coupons (code, description, discount_type, discount_value, minimum_amount, usage_limit, times_used, expiry_date, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [c.code, c.description, c.discount_type, c.discount_value, c.minimum_amount, c.usage_limit, c.times_used, c.expiry_date, c.active]
+        );
+      }
+    }
+
+    // Seed site settings if empty
+    const [settingRows]: any = await pool.query('SELECT COUNT(*) as count FROM site_settings');
+    if (settingRows[0]?.count === 0) {
+      console.log('[Database] Seeding default site settings in MySQL...');
+      for (const [k, v] of Object.entries(memoryStore.site_settings)) {
+        await pool.query(
+          'INSERT INTO site_settings (key_name, key_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE key_value = ?',
+          [k, String(v), String(v)]
+        );
+      }
+    }
+
+    // Ensure admin user exists with role = 'admin'
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@neetnotes.com').trim().toLowerCase();
+    const [adminCheck]: any = await pool.query('SELECT id, role FROM users WHERE email = ?', [adminEmail]);
+    if (adminCheck.length === 0) {
+      const adminPass = process.env.ADMIN_PASSWORD || 'Admin@12345';
+      const hash = await bcrypt.hash(adminPass, 10);
+      await pool.query(
+        'INSERT INTO users (name, email, password_hash, role, status) VALUES (?, ?, ?, "admin", "active")',
+        ['Faculty Administrator', adminEmail, hash]
+      );
+    } else if (adminCheck[0].role !== 'admin') {
+      await pool.query('UPDATE users SET role = "admin" WHERE id = ?', [adminCheck[0].id]);
+    }
+
+    // Also check akifq027@gmail.com
+    const [akifCheck]: any = await pool.query('SELECT id, role FROM users WHERE email = "akifq027@gmail.com"');
+    if (akifCheck.length > 0 && akifCheck[0].role !== 'admin') {
+      await pool.query('UPDATE users SET role = "admin" WHERE id = ?', [akifCheck[0].id]);
+    }
+
+    console.log('[Database] Schema and data synchronized successfully with MySQL.');
   } catch (err) {
     console.error('[Database] Schema sync notice:', err);
   }
