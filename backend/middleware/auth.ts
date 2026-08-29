@@ -57,6 +57,7 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
     const isSpecialAdmin =
       cleanEmail === 'admin@neetnotes.com' ||
       cleanEmail === 'akifq027@gmail.com' ||
+      cleanEmail === 'akifquadri5604@gmail.com' ||
       cleanEmail === envAdminEmail ||
       decoded.role === 'admin';
 
@@ -140,6 +141,7 @@ export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction
   const isSpecialAdmin =
     userEmail === 'admin@neetnotes.com' ||
     userEmail === 'akifq027@gmail.com' ||
+    userEmail === 'akifquadri5604@gmail.com' ||
     userEmail === envAdminEmail;
 
   if (req.user && (req.user.role === 'admin' || isSpecialAdmin)) {

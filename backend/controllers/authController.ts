@@ -41,6 +41,7 @@ export async function register(req: Request, res: Response) {
     const isSpecialAdmin =
       cleanEmail === 'admin@neetnotes.com' ||
       cleanEmail === 'akifq027@gmail.com' ||
+      cleanEmail === 'akifquadri5604@gmail.com' ||
       cleanEmail === envAdminEmail;
 
     // Check if email already registered

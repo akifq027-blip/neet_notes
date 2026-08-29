@@ -385,8 +385,8 @@ export async function initDatabase() {
   memoryStore.site_settings = {
     site_name: 'NEET Notes Marketplace',
     site_tagline: 'High-Yield Medical Entrance Study Material & NCERT Decoders',
-    support_email: 'support@neetnotes.com',
-    support_phone: '+91 98765 43210',
+    support_email: 'akifquadri5604@gmail.com',
+    support_phone: '7989725471',
     maintenance_mode: 'false',
     announcement_bar: '🎉 NEET 2026 Aspirants: Use code NEET20 for 20% OFF on all high-yield notes!',
     currency_symbol: '₹',
@@ -697,20 +697,16 @@ async function syncSchemaIfNeeded() {
       }
     }
 
-    // Seed site settings if empty
-    const [settingRows]: any = await pool.query('SELECT COUNT(*) as count FROM site_settings');
-    if (settingRows[0]?.count === 0) {
-      console.log('[Database] Seeding default site settings in MySQL...');
-      for (const [k, v] of Object.entries(memoryStore.site_settings)) {
-        await pool.query(
-          'INSERT INTO site_settings (key_name, key_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE key_value = ?',
-          [k, String(v), String(v)]
-        );
-      }
+    // Seed or update site settings in MySQL
+    for (const [k, v] of Object.entries(memoryStore.site_settings)) {
+      await pool.query(
+        'INSERT INTO site_settings (key_name, key_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE key_value = ?',
+        [k, String(v), String(v)]
+      );
     }
 
     // Ensure admin user exists with role = 'admin'
-    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@neetnotes.com').trim().toLowerCase();
+    const adminEmail = (process.env.ADMIN_EMAIL || 'akifquadri5604@gmail.com').trim().toLowerCase();
     const [adminCheck]: any = await pool.query('SELECT id, role FROM users WHERE email = ?', [adminEmail]);
     if (adminCheck.length === 0) {
       const adminPass = process.env.ADMIN_PASSWORD || 'Admin@12345';
@@ -723,10 +719,12 @@ async function syncSchemaIfNeeded() {
       await pool.query('UPDATE users SET role = "admin" WHERE id = ?', [adminCheck[0].id]);
     }
 
-    // Also check akifq027@gmail.com
-    const [akifCheck]: any = await pool.query('SELECT id, role FROM users WHERE email = "akifq027@gmail.com"');
-    if (akifCheck.length > 0 && akifCheck[0].role !== 'admin') {
-      await pool.query('UPDATE users SET role = "admin" WHERE id = ?', [akifCheck[0].id]);
+    // Also check akifq027@gmail.com and akifquadri5604@gmail.com
+    for (const em of ['akifq027@gmail.com', 'akifquadri5604@gmail.com', 'admin@neetnotes.com']) {
+      const [uCheck]: any = await pool.query('SELECT id, role FROM users WHERE email = ?', [em]);
+      if (uCheck.length > 0 && uCheck[0].role !== 'admin') {
+        await pool.query('UPDATE users SET role = "admin" WHERE id = ?', [uCheck[0].id]);
+      }
     }
 
     console.log('[Database] Schema and data synchronized successfully with MySQL.');

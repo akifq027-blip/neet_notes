@@ -66,8 +66,8 @@ export const AdminDashboard: React.FC = () => {
   // Site Settings
   const [settings, setSettings] = useState<any>({
     site_name: 'NEET Notes Marketplace HQ',
-    support_email: 'support@neetnoteshq.com',
-    support_phone: '+91 98765 43210',
+    support_email: 'akifquadri5604@gmail.com',
+    support_phone: '7989725471',
     announcement_bar: '🎉 NEET 2026 Aspirants: Use code NEET20 for 20% OFF on all high-yield notes!',
     maintenance_mode: 'false',
   });
@@ -1482,7 +1482,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Support Email</label>
+              <label className="block font-bold text-slate-700 mb-1">Direct Support Email</label>
               <input
                 type="email"
                 value={settings.support_email || ''}
@@ -1492,11 +1492,15 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Support Phone Helpline</label>
+              <label className="block font-bold text-slate-700 mb-1">WhatsApp Direct Support Number (Hidden Redirect)</label>
+              <p className="text-xs text-slate-500 mb-1.5 font-medium">
+                This number powers instant 1-click WhatsApp redirects for students without exposing your raw phone number publicly.
+              </p>
               <input
                 type="text"
                 value={settings.support_phone || ''}
                 onChange={(e) => setSettings({ ...settings, support_phone: e.target.value })}
+                placeholder="7989725471"
                 className="w-full p-2.5 rounded-xl border border-slate-200 outline-none"
               />
             </div>

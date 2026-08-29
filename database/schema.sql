@@ -483,8 +483,8 @@ INSERT INTO `reviews` (`user_id`, `note_id`, `rating`, `review`, `status`) VALUE
 INSERT INTO `site_settings` (`key_name`, `key_value`) VALUES
 ('site_name', 'NEET Notes Marketplace'),
 ('site_tagline', 'High-Yield Medical Entrance Study Material & NCERT Decoders'),
-('support_email', 'support@neetnotes.com'),
-('support_phone', '+91 98765 43210'),
+('support_email', 'akifquadri5604@gmail.com'),
+('support_phone', '7989725471'),
 ('maintenance_mode', 'false'),
 ('announcement_bar', '🎉 NEET 2026 Aspirants: Use code NEET20 for 20% OFF on all high-yield notes!'),
 ('currency_symbol', '₹');

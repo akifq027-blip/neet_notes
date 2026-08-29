@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Send, CheckCircle2, HelpCircle, ShieldCheck, FileCheck, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mail, MessageCircle, MapPin, Send, CheckCircle2, HelpCircle, ShieldCheck, FileCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '../services/api';
 
 // 1. About Us Component
@@ -163,21 +163,36 @@ export const ContactPage: React.FC = () => {
           </div>
 
           <div className="space-y-3 text-xs">
-            <div className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-200">
-              <Mail className="w-4 h-4 text-emerald-600" />
-              <div>
-                <div className="font-bold text-slate-900">Email Support</div>
-                <div className="text-slate-500">support@neetnoteshq.com</div>
+            <a
+              href="mailto:akifquadri5604@gmail.com"
+              className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-200 hover:border-teal-500 hover:shadow-xs transition-all group block"
+            >
+              <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center text-teal-700 shrink-0 group-hover:bg-teal-600 group-hover:text-white transition-colors">
+                <Mail className="w-4 h-4" />
               </div>
-            </div>
+              <div className="min-w-0">
+                <div className="font-bold text-slate-900">Direct Support Email</div>
+                <div className="text-teal-700 font-semibold truncate">akifquadri5604@gmail.com</div>
+              </div>
+            </a>
 
-            <div className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-200">
-              <Phone className="w-4 h-4 text-teal-600" />
-              <div>
-                <div className="font-bold text-slate-900">WhatsApp / Helpline</div>
-                <div className="text-slate-500">+91 98765 43210 (9 AM - 8 PM IST)</div>
+            <a
+              href="https://wa.me/917989725471?text=Hello%20NEET%20Notes%20Team%2C%20I%20have%20a%20query%20regarding%20study%20materials"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 p-3.5 bg-emerald-50/80 rounded-xl border border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50 hover:shadow-xs transition-all group block"
+            >
+              <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform">
+                <MessageCircle className="w-4 h-4" />
               </div>
-            </div>
+              <div className="min-w-0">
+                <div className="font-bold text-slate-900 flex items-center gap-2">
+                  <span>Direct WhatsApp Helpdesk</span>
+                  <span className="bg-emerald-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase">Online</span>
+                </div>
+                <div className="text-emerald-700 font-semibold text-[11px] mt-0.5">Click to chat directly with Academic Faculty (Instant Reply)</div>
+              </div>
+            </a>
           </div>
         </div>
 

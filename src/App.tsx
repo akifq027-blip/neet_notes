@@ -13,6 +13,7 @@ import {
   Heart,
   ChevronRight,
   TrendingUp,
+  MessageCircle,
 } from 'lucide-react';
 import { Note, CartItem, User } from './types';
 import { api } from './services/api';
@@ -614,6 +615,21 @@ export function App() {
           setIsAuthOpen(true);
         }}
       />
+
+      {/* Floating WhatsApp Quick Helpdesk (Hidden Direct Redirect) */}
+      <a
+        id="floating-whatsapp-support-btn"
+        href="https://wa.me/917989725471?text=Hello%20NEET%20Notes%20Team%2C%20I%20have%20a%20query%20regarding%20study%20materials"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-40 bg-emerald-600 hover:bg-emerald-700 text-white p-3.5 sm:px-4 sm:py-3 rounded-full shadow-lg shadow-emerald-700/30 flex items-center gap-2.5 transition-all hover:scale-105 group border-2 border-white/20"
+        title="Direct WhatsApp Faculty Helpdesk"
+      >
+        <MessageCircle className="w-5 h-5 text-white" />
+        <span className="hidden sm:inline text-xs font-black uppercase tracking-wider">
+          Faculty Helpdesk
+        </span>
+      </a>
 
       {/* 1. Preview Reader Modal (Free 3-5 pages viewer) */}
       <PreviewReaderModal

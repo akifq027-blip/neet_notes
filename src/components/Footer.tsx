@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, ShieldCheck, Zap, Award, Lock, Mail, Phone, Heart } from 'lucide-react';
+import { BookOpen, ShieldCheck, Zap, Award, Lock, Mail, MessageCircle, Heart } from 'lucide-react';
 
 interface FooterProps {
   onNavigate: (view: string, param?: any) => void;
@@ -110,14 +110,24 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenAdminLogin }) 
             <h4 className="text-xs font-black uppercase tracking-widest text-teal-400">Direct Support</h4>
             <p className="text-xs text-slate-400 font-medium">Have a question regarding note bundles or instant access?</p>
             <div className="space-y-2 text-xs font-bold text-slate-300">
-              <div className="flex items-center gap-2">
+              <a
+                href="mailto:akifquadri5604@gmail.com"
+                className="flex items-center gap-2 text-slate-300 hover:text-teal-300 transition-colors"
+                title="Direct Email Support"
+              >
                 <Mail className="w-4 h-4 text-teal-400 shrink-0" />
-                <span>support@neetnoteshq.com</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-teal-400 shrink-0" />
-                <span>+91 98765 43210 (Mon-Sat)</span>
-              </div>
+                <span className="truncate">akifquadri5604@gmail.com</span>
+              </a>
+              <a
+                href="https://wa.me/917989725471?text=Hello%20NEET%20Notes%20Team%2C%20I%20have%20a%20query%20regarding%20study%20materials"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer group"
+                title="Instant WhatsApp Helpdesk"
+              >
+                <MessageCircle className="w-4 h-4 text-emerald-400 shrink-0 group-hover:scale-110 transition-transform" />
+                <span className="underline underline-offset-2">Direct WhatsApp Helpdesk</span>
+              </a>
             </div>
             <div className="pt-2">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded border border-slate-700/60">

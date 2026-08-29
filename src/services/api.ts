@@ -764,8 +764,8 @@ export const api = {
       success: true,
       settings: {
         site_name: 'NEET Notes Marketplace',
-        support_email: 'support@neetnotes.com',
-        support_phone: '+91 98765 43210',
+        support_email: 'akifquadri5604@gmail.com',
+        support_phone: '7989725471',
         notice_banner: '⚡ Mega NEET 2026 Batch Discount: Use code DOCTOR50 for 50% OFF on all biology modules!',
         currency_symbol: '₹',
         allow_refunds: true,
