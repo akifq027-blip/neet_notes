@@ -4,9 +4,11 @@ import { Note } from '../types';
 
 interface NoteCardProps {
   note: Note;
-  onSelect: (note: Note) => void;
+  onSelect?: (note: Note) => void;
   onPreview: (note: Note) => void;
   onAddToCart: (note: Note) => void;
+  onBuyNow?: (note: Note) => void;
+  onOpenDetail?: (noteId: number) => void;
   onToggleWishlist?: (noteId: number) => void;
   isInCart?: boolean;
   isWishlisted?: boolean;
@@ -18,6 +20,8 @@ export const NoteCard: React.FC<NoteCardProps> = ({
   onSelect,
   onPreview,
   onAddToCart,
+  onBuyNow,
+  onOpenDetail,
   onToggleWishlist,
   isInCart = false,
   isWishlisted = false,
@@ -38,16 +42,19 @@ export const NoteCard: React.FC<NoteCardProps> = ({
 
   const watermark = getSubjectWatermark(note.subject);
 
-  const discountPercent =
-    note.original_price > note.price
-      ? Math.round(((note.original_price - note.price) / note.original_price) * 100)
-      : 0;
+  const handleClick = () => {
+    if (onOpenDetail) {
+      onOpenDetail(note.id);
+    } else if (onSelect) {
+      onSelect(note);
+    }
+  };
 
   return (
     <div
       id={`note-card-${note.id}`}
       className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
-      onClick={() => onSelect(note)}
+      onClick={handleClick}
     >
       <div>
         {/* Top Media / Thumbnail Section */}
@@ -164,7 +171,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
               id={`owned-btn-${note.id}`}
               onClick={(e) => {
                 e.stopPropagation();
-                onSelect(note);
+                handleClick();
               }}
               className="bg-teal-100 text-teal-800 text-[10px] uppercase font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer"
             >

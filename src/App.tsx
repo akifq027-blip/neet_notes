@@ -222,7 +222,13 @@ export function App() {
       setFreeOnly(true);
       setCurrentView('notes');
     } else if (view === 'notes') {
-      if (param) setSelectedSubject(param);
+      if (param) {
+        if (typeof param === 'object' && param.subject) {
+          setSelectedSubject(param.subject);
+        } else if (typeof param === 'string') {
+          setSelectedSubject(param);
+        }
+      }
       setFreeOnly(false);
       setCurrentView('notes');
     } else {
@@ -243,14 +249,21 @@ export function App() {
       <Navbar
         user={currentUser}
         cartCount={cartItems.length}
+        wishlistCount={wishlistIds.length}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenAuth={(mode) => {
-          setAuthMode(mode);
+          setAuthMode(mode || 'login');
           setIsAuthOpen(true);
         }}
         onLogout={handleLogout}
         onNavigate={handleNavigate}
         currentView={currentView}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchSubmit={() => {
+          handleNavigate('notes');
+          fetchNotesList();
+        }}
       />
 
       {/* Main Content Area Based on Current View */}
@@ -594,7 +607,13 @@ export function App() {
       </main>
 
       {/* Footer */}
-      <Footer onNavigate={handleNavigate} />
+      <Footer
+        onNavigate={handleNavigate}
+        onOpenAdminLogin={() => {
+          setAuthMode('admin');
+          setIsAuthOpen(true);
+        }}
+      />
 
       {/* 1. Preview Reader Modal (Free 3-5 pages viewer) */}
       <PreviewReaderModal
@@ -673,4 +692,3 @@ export function App() {
 }
 
 export default App;
-

@@ -7,6 +7,7 @@ interface PreviewReaderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddToCart: (note: Note) => void;
+  onBuyNow?: (note: Note) => void;
   isPurchased?: boolean;
 }
 
@@ -15,6 +16,7 @@ export const PreviewReaderModal: React.FC<PreviewReaderModalProps> = ({
   isOpen,
   onClose,
   onAddToCart,
+  onBuyNow,
   isPurchased = false,
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -206,7 +208,11 @@ export const PreviewReaderModal: React.FC<PreviewReaderModalProps> = ({
               <button
                 id="preview-unlock-btn"
                 onClick={() => {
-                  onAddToCart(note);
+                  if (onBuyNow) {
+                    onBuyNow(note);
+                  } else {
+                    onAddToCart(note);
+                  }
                   onClose();
                 }}
                 className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer"

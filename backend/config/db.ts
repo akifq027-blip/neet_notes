@@ -393,16 +393,28 @@ export async function initDatabase() {
   };
 
   try {
-    const connection = await mysql.createConnection({
-      host: DB_HOST,
-      user: DB_USER,
-      password: DB_PASSWORD,
-      port: DB_PORT,
-      connectTimeout: 2000,
-    });
+    const isCloudDB = DB_HOST.includes('aivencloud.com') || DB_HOST.includes('amazonaws.com') || process.env.DB_SSL === 'true' || DB_PORT !== 3306;
+    const sslConfig = isCloudDB ? { rejectUnauthorized: false } : undefined;
 
-    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;`);
-    await connection.end();
+    try {
+      const connection = await mysql.createConnection({
+        host: DB_HOST,
+        user: DB_USER,
+        password: DB_PASSWORD,
+        port: DB_PORT,
+        ssl: sslConfig,
+        connectTimeout: 4000,
+      });
+
+      try {
+        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;`);
+      } catch (dbCreateErr) {
+        // Managed DB users might not have CREATE DATABASE privileges for already created DB
+      }
+      await connection.end();
+    } catch (preErr) {
+      // Connect directly to pool if initial connection check fails or DB already exists
+    }
 
     pool = mysql.createPool({
       host: DB_HOST,
@@ -410,9 +422,11 @@ export async function initDatabase() {
       password: DB_PASSWORD,
       database: DB_NAME,
       port: DB_PORT,
+      ssl: sslConfig,
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
+      connectTimeout: 5000,
     });
 
     const testConn = await pool.getConnection();
