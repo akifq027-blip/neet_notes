@@ -1,6 +1,6 @@
 {
-  "name": "NEET Notes Marketplace",
-  "description": "Full-stack educational marketplace for NEET aspirants to preview, purchase, and download high-yield study notes, question banks, PYQs, and revision materials.",
+  "name": "NCERT NOTES - Class 8-12 & NEET",
+  "description": "Comprehensive NCERT notes, chapter-wise question banks, speed formula sheets, board preparation materials, and solved PYQs for Class 8 to 12 and NEET aspirants.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

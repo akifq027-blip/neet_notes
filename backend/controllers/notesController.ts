@@ -9,6 +9,9 @@ export async function getNotes(req: AuthRequest, res: Response) {
     const {
       search,
       subject,
+      class_level,
+      exam,
+      resource_type,
       chapter,
       category,
       category_id,
@@ -33,14 +36,29 @@ export async function getNotes(req: AuthRequest, res: Response) {
         const params: any[] = [];
 
         if (search) {
-          whereClauses.push('(n.title LIKE ? OR n.description LIKE ? OR n.chapter LIKE ? OR n.subject LIKE ?)');
+          whereClauses.push('(n.title LIKE ? OR n.description LIKE ? OR n.chapter LIKE ? OR n.subject LIKE ? OR n.class_level LIKE ? OR n.exam LIKE ?)');
           const term = `%${search}%`;
-          params.push(term, term, term, term);
+          params.push(term, term, term, term, term, term);
         }
 
         if (subject && subject !== 'All') {
           whereClauses.push('n.subject = ?');
           params.push(subject);
+        }
+
+        if (class_level && class_level !== 'All') {
+          whereClauses.push('n.class_level = ?');
+          params.push(class_level);
+        }
+
+        if (exam && exam !== 'All') {
+          whereClauses.push('n.exam = ?');
+          params.push(exam);
+        }
+
+        if (resource_type && resource_type !== 'All') {
+          whereClauses.push('n.resource_type = ?');
+          params.push(resource_type);
         }
 
         if (chapter) {
@@ -128,12 +146,27 @@ export async function getNotes(req: AuthRequest, res: Response) {
           n.title.toLowerCase().includes(q) ||
           n.description.toLowerCase().includes(q) ||
           n.chapter.toLowerCase().includes(q) ||
-          n.subject.toLowerCase().includes(q)
+          n.subject.toLowerCase().includes(q) ||
+          (n.class_level && n.class_level.toLowerCase().includes(q)) ||
+          (n.exam && n.exam.toLowerCase().includes(q)) ||
+          (n.resource_type && n.resource_type.toLowerCase().includes(q))
       );
     }
 
     if (subject && subject !== 'All') {
       results = results.filter(n => n.subject.toLowerCase() === String(subject).toLowerCase());
+    }
+
+    if (class_level && class_level !== 'All') {
+      results = results.filter(n => (n.class_level || 'NEET').toLowerCase() === String(class_level).toLowerCase());
+    }
+
+    if (exam && exam !== 'All') {
+      results = results.filter(n => (n.exam || 'NEET').toLowerCase() === String(exam).toLowerCase());
+    }
+
+    if (resource_type && resource_type !== 'All') {
+      results = results.filter(n => (n.resource_type || 'Notes').toLowerCase() === String(resource_type).toLowerCase());
     }
 
     if (chapter) {

@@ -149,6 +149,9 @@ export const AdminDashboard: React.FC = () => {
         // Optimistically update note in state
         const updatedTitle = (formData.get('title') as string) || editingNote.title;
         const updatedSubject = (formData.get('subject') as string) || editingNote.subject;
+        const updatedClassLevel = (formData.get('class_level') as string) || editingNote.class_level || 'NEET';
+        const updatedExam = (formData.get('exam') as string) || editingNote.exam || 'NEET';
+        const updatedResourceType = (formData.get('resource_type') as string) || editingNote.resource_type || 'Notes';
         const updatedChapter = (formData.get('chapter') as string) || editingNote.chapter;
         const updatedPrice = parseFloat((formData.get('price') as string) || String(editingNote.price));
         const updatedOrigPrice = parseFloat((formData.get('original_price') as string) || String(editingNote.original_price));
@@ -167,6 +170,9 @@ export const AdminDashboard: React.FC = () => {
                   ...n,
                   title: updatedTitle,
                   subject: updatedSubject,
+                  class_level: updatedClassLevel as any,
+                  exam: updatedExam as any,
+                  resource_type: updatedResourceType as any,
                   chapter: updatedChapter,
                   price: updatedPrice,
                   original_price: updatedOrigPrice,
@@ -834,6 +840,22 @@ export const AdminDashboard: React.FC = () => {
                 </div>
 
                 <div>
+                  <label className="block font-bold text-slate-700 mb-1">Class / Grade Level</label>
+                  <select
+                    name="class_level"
+                    defaultValue={editingNote?.class_level || 'NEET'}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none font-medium"
+                  >
+                    <option value="Class 8">Class 8</option>
+                    <option value="Class 9">Class 9</option>
+                    <option value="Class 10">Class 10</option>
+                    <option value="Class 11">Class 11</option>
+                    <option value="Class 12">Class 12</option>
+                    <option value="NEET">NEET (Dropper / 11+12)</option>
+                  </select>
+                </div>
+
+                <div>
                   <label className="block font-bold text-slate-700 mb-1">Subject</label>
                   <select
                     name="subject"
@@ -843,7 +865,41 @@ export const AdminDashboard: React.FC = () => {
                     <option value="Physics">Physics</option>
                     <option value="Chemistry">Chemistry</option>
                     <option value="Biology">Biology</option>
+                    <option value="Science">Science (Class 8-10)</option>
+                    <option value="Mathematics">Mathematics (Class 8-12)</option>
+                    <option value="Social Science">Social Science (Class 8-10)</option>
                     <option value="General NEET">General NEET</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Exam Target</label>
+                  <select
+                    name="exam"
+                    defaultValue={editingNote?.exam || 'NEET'}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none font-medium"
+                  >
+                    <option value="NEET">NEET</option>
+                    <option value="Board">Board Exam</option>
+                    <option value="CBSE">CBSE</option>
+                    <option value="School">School Level</option>
+                    <option value="Foundation">Foundation / Olympiad</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Resource Type</label>
+                  <select
+                    name="resource_type"
+                    defaultValue={editingNote?.resource_type || 'Notes'}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none font-medium"
+                  >
+                    <option value="Notes">Comprehensive Notes</option>
+                    <option value="Formula Book">Formula Sheet / Cheat Code</option>
+                    <option value="Revision">Revision Mindmap / Summary</option>
+                    <option value="PYQs">Previous Year Questions (PYQs)</option>
+                    <option value="Question Bank">Question Bank / Exemplar</option>
+                    <option value="Sample Paper">Sample Paper / Model Paper</option>
                   </select>
                 </div>
 

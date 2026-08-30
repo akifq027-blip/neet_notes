@@ -5,7 +5,7 @@ interface HeroSectionProps {
   onSearchChange: (q: string) => void;
   onSearchSubmit: () => void;
   searchQuery: string;
-  onExplore: (subject?: string) => void;
+  onExplore: (filterParam?: string | { class_level?: string; subject?: string }) => void;
   onFreeResources: () => void;
 }
 
@@ -28,16 +28,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           <div className="max-w-2xl space-y-5 text-left">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-800/80 border border-teal-500/40 text-teal-200 text-xs font-black uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-teal-300 animate-pulse" />
-              <span>NEET-UG 2026 High-Yield Question Decoders</span>
+              <span>NCERT Notes for Class 8, 9, 10, 11, 12 & NEET Aspirants</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black leading-tight sm:leading-none tracking-tight">
-              CRACK NEET 2026 <br />
+              MASTER NCERT & ACES <br />
               WITH <span className="text-teal-300">TOPPER NOTES.</span>
             </h1>
 
             <p className="text-teal-100 text-base sm:text-lg font-medium opacity-90 max-w-xl leading-relaxed">
-              High-quality revision material, NCERT-based diagrams, and chapter-wise question banks curated by AIIMS rankers and Kota top faculty.
+              Concise chapter notes, formula sheets, NCERT exemplar decoders, and high-yield question banks for Class 8–12 Board Exams & NEET.
             </p>
 
             {/* Search Input Bar */}
@@ -50,7 +50,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   value={searchQuery}
                   onChange={(e) => onSearchChange(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit()}
-                  placeholder="Search by chapter (e.g. Genetics, Thermodynamics, Optics)..."
+                  placeholder="Search by class, subject or chapter (e.g. Class 10 Science, Genetics, Calculus)..."
                   className="w-full bg-transparent text-slate-800 placeholder-slate-400 text-xs sm:text-sm px-3 py-2.5 focus:outline-none font-medium"
                 />
                 <button
@@ -62,27 +62,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </button>
               </div>
 
-              {/* Quick Find Tags */}
+              {/* Quick Find Tags for Classes & Subjects */}
               <div className="flex flex-wrap items-center gap-2 pt-3 text-xs font-bold">
-                <span className="text-teal-200 uppercase tracking-wider text-[11px]">Quick Find:</span>
-                <button
-                  onClick={() => onExplore('Physics')}
-                  className="px-3 py-1 rounded-full bg-teal-800/80 hover:bg-teal-800 text-white border border-teal-600/50 transition-colors cursor-pointer"
-                >
-                  ⚡ Physics
-                </button>
-                <button
-                  onClick={() => onExplore('Chemistry')}
-                  className="px-3 py-1 rounded-full bg-teal-800/80 hover:bg-teal-800 text-white border border-teal-600/50 transition-colors cursor-pointer"
-                >
-                  🧪 Chemistry
-                </button>
-                <button
-                  onClick={() => onExplore('Biology')}
-                  className="px-3 py-1 rounded-full bg-teal-800/80 hover:bg-teal-800 text-white border border-teal-600/50 transition-colors cursor-pointer"
-                >
-                  🌿 Biology
-                </button>
+                <span className="text-teal-200 uppercase tracking-wider text-[11px]">Select Class:</span>
+                {['Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12', 'NEET'].map((cls) => (
+                  <button
+                    key={cls}
+                    onClick={() => onExplore({ class_level: cls })}
+                    className="px-2.5 py-1 rounded-full bg-teal-800/80 hover:bg-teal-800 text-white border border-teal-600/50 transition-colors cursor-pointer text-xs"
+                  >
+                    {cls}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -104,7 +95,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 className="bg-teal-800 text-white px-6 py-3 rounded-xl font-bold border border-teal-500 hover:bg-teal-900 transition-all text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2 cursor-pointer"
               >
                 <Download className="w-4 h-4 text-teal-300" />
-                <span>Download Free Sample</span>
+                <span>Download Free Samples</span>
               </button>
             </div>
           </div>
@@ -112,18 +103,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           {/* Right Floating Stats Strip in Hero */}
           <div className="grid grid-cols-2 gap-4 lg:flex lg:flex-col lg:space-y-4 lg:w-72 shrink-0">
             <div className="bg-teal-800/80 backdrop-blur-xs border border-teal-600/40 p-5 rounded-2xl">
-              <div className="text-4xl font-black tracking-tight text-white">15K+</div>
-              <div className="text-teal-200 text-xs font-bold uppercase tracking-widest mt-1">Active Students</div>
+              <div className="text-4xl font-black tracking-tight text-white">25K+</div>
+              <div className="text-teal-200 text-xs font-bold uppercase tracking-widest mt-1">Class 8–12 & NEET Users</div>
             </div>
 
             <div className="bg-teal-800/80 backdrop-blur-xs border border-teal-600/40 p-5 rounded-2xl">
-              <div className="text-4xl font-black tracking-tight text-teal-300">450+</div>
-              <div className="text-teal-200 text-xs font-bold uppercase tracking-widest mt-1">Study Guides</div>
+              <div className="text-4xl font-black tracking-tight text-teal-300">500+</div>
+              <div className="text-teal-200 text-xs font-bold uppercase tracking-widest mt-1">NCERT Chapters Covered</div>
             </div>
 
             <div className="bg-teal-800/80 backdrop-blur-xs border border-teal-600/40 p-5 rounded-2xl col-span-2 lg:col-span-1">
               <div className="text-3xl sm:text-4xl font-black tracking-tight text-amber-300">4.9 ★</div>
-              <div className="text-teal-200 text-xs font-bold uppercase tracking-widest mt-1">Highest Rated Notes</div>
+              <div className="text-teal-200 text-xs font-bold uppercase tracking-widest mt-1">Highest Rated Materials</div>
             </div>
           </div>
         </div>
@@ -140,7 +131,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           </div>
           <div className="flex items-center gap-2.5 bg-teal-800/50 p-3 rounded-xl border border-teal-600/40">
             <Award className="w-4 h-4 text-teal-300 shrink-0" />
-            <span className="text-white uppercase tracking-wider">AIIMS Ranker Curated</span>
+            <span className="text-white uppercase tracking-wider">Top Faculty Curated</span>
           </div>
           <div className="flex items-center gap-2.5 bg-teal-800/50 p-3 rounded-xl border border-teal-600/40">
             <CheckCircle2 className="w-4 h-4 text-teal-300 shrink-0" />

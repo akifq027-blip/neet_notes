@@ -81,10 +81,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-2xl font-black tracking-tighter text-teal-600">NEET<span className="text-slate-800">NOTES</span></span>
-                <span className="bg-teal-100 text-teal-800 text-[10px] font-black px-1.5 py-0.5 rounded tracking-widest uppercase">HQ</span>
+                <span className="text-2xl font-black tracking-tighter text-teal-600">NCERT<span className="text-slate-800">NOTES</span></span>
+                <span className="bg-teal-100 text-teal-800 text-[10px] font-black px-1.5 py-0.5 rounded tracking-widest uppercase">8–12 & NEET</span>
               </div>
-              <p className="text-[10px] text-slate-500 font-bold tracking-wider uppercase hidden sm:block">AIIMS & Kota Medical Notes</p>
+              <p className="text-[10px] text-slate-500 font-bold tracking-wider uppercase hidden sm:block">Notes for Class 8–12 & NEET</p>
             </div>
           </button>
 

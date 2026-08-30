@@ -41,7 +41,10 @@ export function App() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [featuredNotes, setFeaturedNotes] = useState<Note[]>([]);
   const [isLoadingNotes, setIsLoadingNotes] = useState(true);
+  const [selectedClass, setSelectedClass] = useState<string>('All');
   const [selectedSubject, setSelectedSubject] = useState<string>('All');
+  const [selectedResourceType, setSelectedResourceType] = useState<string>('All');
+  const [selectedExam, setSelectedExam] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<string>('popular');
   const [freeOnly, setFreeOnly] = useState<boolean>(false);
@@ -117,13 +120,16 @@ export function App() {
   // Re-fetch notes on filter change
   useEffect(() => {
     fetchNotesList();
-  }, [selectedSubject, sortBy, freeOnly]);
+  }, [selectedClass, selectedSubject, selectedResourceType, selectedExam, sortBy, freeOnly]);
 
   const fetchNotesList = async () => {
     setIsLoadingNotes(true);
     try {
       const params: any = { sort: sortBy };
+      if (selectedClass !== 'All') params.class_level = selectedClass;
       if (selectedSubject !== 'All') params.subject = selectedSubject;
+      if (selectedResourceType !== 'All') params.resource_type = selectedResourceType;
+      if (selectedExam !== 'All') params.exam = selectedExam;
       if (freeOnly || currentView === 'free') params.is_free = 'true';
       if (searchQuery.trim()) params.search = searchQuery.trim();
 
@@ -224,13 +230,21 @@ export function App() {
       setCurrentView('notes');
     } else if (view === 'notes') {
       if (param) {
-        if (typeof param === 'object' && param.subject) {
-          setSelectedSubject(param.subject);
+        if (typeof param === 'object') {
+          if (param.class_level) setSelectedClass(param.class_level);
+          if (param.subject) setSelectedSubject(param.subject);
+          if (param.resource_type) setSelectedResourceType(param.resource_type);
+          if (param.exam) setSelectedExam(param.exam);
+          if (param.is_free !== undefined) setFreeOnly(Boolean(param.is_free));
         } else if (typeof param === 'string') {
-          setSelectedSubject(param);
+          if (param.startsWith('Class ') || param === 'NEET') {
+            setSelectedClass(param);
+          } else {
+            setSelectedSubject(param);
+          }
         }
       }
-      setFreeOnly(false);
+      if (!param?.is_free) setFreeOnly(false);
       setCurrentView('notes');
     } else {
       setCurrentView(view as any);
@@ -243,7 +257,7 @@ export function App() {
       {/* Top Announcement Bar */}
       <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white text-xs py-2 px-4 text-center font-bold tracking-wide flex items-center justify-center gap-2 shadow-xs">
         <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-        <span>NEET 2026 Aspirants: Use code <strong>NEET20</strong> for 20% OFF on all study modules!</span>
+        <span>Class 8–12 & NEET Study Notes: Use code <strong>NCERT20</strong> for 20% OFF on all modules!</span>
       </div>
 
       {/* Main Navbar */}
@@ -287,43 +301,41 @@ export function App() {
               onFreeResources={() => handleNavigate('free')}
             />
 
-            {/* Subject Categories Strip */}
+            {/* Subject / Class Categories Strip */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <button
-                  id="cat-physics-btn"
+                  id="cat-class8-10-btn"
                   onClick={() => {
-                    setSelectedSubject('Physics');
-                    handleNavigate('notes');
+                    handleNavigate('notes', { class_level: 'Class 10' });
                   }}
                   className="bg-white hover:bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all text-left flex items-center justify-between group cursor-pointer"
                 >
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase text-blue-600 tracking-widest">Physics</span>
+                    <span className="text-[10px] font-black uppercase text-blue-600 tracking-widest">Class 8–10</span>
                     <h3 className="font-extrabold text-slate-900 text-sm group-hover:text-teal-600 transition-colors">
-                      Mechanics & PYQs
+                      NCERT Science & Maths
                     </h3>
-                    <p className="text-[11px] text-slate-500 font-medium">Formula sheets & decoders</p>
+                    <p className="text-[11px] text-slate-500 font-medium">Concept summaries & formulas</p>
                   </div>
                   <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-lg group-hover:scale-110 transition-transform">
-                    ⚡
+                    📚
                   </div>
                 </button>
 
                 <button
-                  id="cat-chemistry-btn"
+                  id="cat-class11-12-btn"
                   onClick={() => {
-                    setSelectedSubject('Chemistry');
-                    handleNavigate('notes');
+                    handleNavigate('notes', { class_level: 'Class 12' });
                   }}
                   className="bg-white hover:bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all text-left flex items-center justify-between group cursor-pointer"
                 >
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase text-amber-600 tracking-widest">Chemistry</span>
+                    <span className="text-[10px] font-black uppercase text-amber-600 tracking-widest">Class 11–12</span>
                     <h3 className="font-extrabold text-slate-900 text-sm group-hover:text-teal-600 transition-colors">
-                      Organic & Inorganic
+                      Board & Foundation
                     </h3>
-                    <p className="text-[11px] text-slate-500 font-medium">Reaction mechanisms</p>
+                    <p className="text-[11px] text-slate-500 font-medium">Physics, Chemistry, Bio & Math</p>
                   </div>
                   <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-black text-lg group-hover:scale-110 transition-transform">
                     🧪
@@ -331,22 +343,21 @@ export function App() {
                 </button>
 
                 <button
-                  id="cat-biology-btn"
+                  id="cat-neet-btn"
                   onClick={() => {
-                    setSelectedSubject('Biology');
-                    handleNavigate('notes');
+                    handleNavigate('notes', { class_level: 'NEET' });
                   }}
                   className="bg-white hover:bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all text-left flex items-center justify-between group cursor-pointer"
                 >
                   <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase text-teal-600 tracking-widest">Biology</span>
+                    <span className="text-[10px] font-black uppercase text-teal-600 tracking-widest">NEET UG</span>
                     <h3 className="font-extrabold text-slate-900 text-sm group-hover:text-teal-600 transition-colors">
-                      Physiology & NCERT
+                      Topper Mindmaps & PYQs
                     </h3>
-                    <p className="text-[11px] text-slate-500 font-medium">Line-by-line decoders</p>
+                    <p className="text-[11px] text-slate-500 font-medium">NCERT line-by-line decoders</p>
                   </div>
                   <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-black text-lg group-hover:scale-110 transition-transform">
-                    🌿
+                    ⚡
                   </div>
                 </button>
 
@@ -360,7 +371,7 @@ export function App() {
                     <h3 className="font-extrabold text-white text-sm">
                       Free Revision Packs
                     </h3>
-                    <p className="text-[11px] text-teal-100 font-medium">Sample diagrams & tables</p>
+                    <p className="text-[11px] text-teal-100 font-medium">Sample diagrams & cheat sheets</p>
                   </div>
                   <div className="w-10 h-10 rounded-xl bg-teal-800 text-white flex items-center justify-center font-black text-lg group-hover:scale-110 transition-transform">
                     🎁
@@ -468,36 +479,19 @@ export function App() {
         {currentView === 'notes' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
             {/* Header & Filter Controls */}
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-black text-slate-900">
-                    {freeOnly ? 'Free NEET Study Packs' : 'Complete NEET Study Notes Catalog'}
+                    {freeOnly ? 'Free Study Packs' : 'Complete Study Notes Catalog'}
                   </h1>
                   <p className="text-xs text-slate-500 mt-1">
-                    Showing {notes.length} curated study modules mapped to the rationalized syllabus.
+                    Showing {notes.length} curated study modules mapped to the rationalized NCERT & NEET syllabus.
                   </p>
                 </div>
 
-                {/* Filter Options */}
+                {/* Sort & Free Controls */}
                 <div className="flex flex-wrap items-center gap-3">
-                  {/* Subject Pills */}
-                  <div className="flex items-center bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold">
-                    {['All', 'Physics', 'Chemistry', 'Biology'].map((sub) => (
-                      <button
-                        key={sub}
-                        onClick={() => setSelectedSubject(sub)}
-                        className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                          selectedSubject === sub
-                            ? 'bg-slate-900 text-white'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        {sub}
-                      </button>
-                    ))}
-                  </div>
-
                   {/* Sort Dropdown */}
                   <div className="flex items-center gap-1.5 bg-white px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold">
                     <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
@@ -528,6 +522,73 @@ export function App() {
                 </div>
               </div>
 
+              {/* Class Selection Tabs */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+                {['All', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12', 'NEET'].map((cls) => (
+                  <button
+                    key={cls}
+                    onClick={() => setSelectedClass(cls)}
+                    className={`px-4 py-2 rounded-xl text-xs font-black tracking-wide whitespace-nowrap transition-all cursor-pointer ${
+                      selectedClass === cls
+                        ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
+                        : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {cls === 'All' ? 'All Classes' : cls}
+                  </button>
+                ))}
+              </div>
+
+              {/* Sub-Filters: Subject & Resource Type */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200">
+                {/* Subject Pills */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Subject:</span>
+                  {['All', 'Physics', 'Chemistry', 'Biology', 'Science', 'Mathematics', 'Social Science'].map((sub) => (
+                    <button
+                      key={sub}
+                      onClick={() => setSelectedSubject(sub)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                        selectedSubject === sub
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                      }`}
+                    >
+                      {sub}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Resource Type & Exam dropdowns */}
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedResourceType}
+                    onChange={(e) => setSelectedResourceType(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none cursor-pointer"
+                  >
+                    <option value="All">All Resource Types</option>
+                    <option value="Notes">Comprehensive Notes</option>
+                    <option value="Formula Book">Formula Book</option>
+                    <option value="Revision">Revision Summary</option>
+                    <option value="PYQs">Previous Year Questions</option>
+                    <option value="Question Bank">Question Bank</option>
+                    <option value="Sample Paper">Sample Paper</option>
+                  </select>
+
+                  <select
+                    value={selectedExam}
+                    onChange={(e) => setSelectedExam(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none cursor-pointer"
+                  >
+                    <option value="All">All Exams</option>
+                    <option value="NEET">NEET UG</option>
+                    <option value="Board">CBSE / State Boards</option>
+                    <option value="School">School Exams</option>
+                    <option value="Foundation">Foundation Olympiads</option>
+                  </select>
+                </div>
+              </div>
+
               {/* Search Bar */}
               <div className="relative">
                 <input
@@ -535,7 +596,7 @@ export function App() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter by chapter name, topic or keywords (e.g. Optics, Aldehydes, Genetics)..."
+                  placeholder="Filter by chapter name, topic or keywords (e.g. Chemical Reactions, Optics, Aldehydes, Genetics)..."
                   className="w-full text-xs pl-10 pr-4 py-3 rounded-2xl bg-white border border-slate-200 shadow-xs focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
                 />
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -554,7 +615,10 @@ export function App() {
                 <p className="text-xs text-slate-500">Try clearing your filters or search for another chapter name.</p>
                 <button
                   onClick={() => {
+                    setSelectedClass('All');
                     setSelectedSubject('All');
+                    setSelectedResourceType('All');
+                    setSelectedExam('All');
                     setSearchQuery('');
                     setFreeOnly(false);
                   }}

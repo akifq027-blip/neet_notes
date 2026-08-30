@@ -86,10 +86,20 @@ export const NoteCard: React.FC<NoteCardProps> = ({
           )}
 
           {/* Badges Overlay */}
-          <div className="absolute top-2 left-2 flex items-center gap-1 z-10">
+          <div className="absolute top-2 left-2 flex flex-wrap items-center gap-1 z-10">
+            {note.class_level && (
+              <span className="bg-teal-700/90 backdrop-blur-xs text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded shadow-xs">
+                {note.class_level}
+              </span>
+            )}
             <span className="bg-slate-900/80 backdrop-blur-xs text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded">
               {note.subject}
             </span>
+            {note.resource_type && note.resource_type !== 'Notes' && (
+              <span className="bg-amber-600/90 backdrop-blur-xs text-white text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded">
+                {note.resource_type}
+              </span>
+            )}
           </div>
 
           {Boolean(note.is_bestseller) && (

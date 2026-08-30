@@ -415,12 +415,29 @@ export const api = {
     if (params.subject && params.subject !== 'All') {
       filtered = filtered.filter(n => n.subject.toLowerCase() === params.subject.toLowerCase());
     }
+    if (params.class_level && params.class_level !== 'All') {
+      filtered = filtered.filter(n => (n.class_level || 'NEET').toLowerCase() === params.class_level.toLowerCase());
+    }
+    if (params.exam && params.exam !== 'All') {
+      filtered = filtered.filter(n => (n.exam || 'NEET').toLowerCase() === params.exam.toLowerCase());
+    }
+    if (params.resource_type && params.resource_type !== 'All') {
+      filtered = filtered.filter(n => (n.resource_type || 'Notes').toLowerCase() === params.resource_type.toLowerCase());
+    }
     if (params.is_free === 'true' || params.is_free === true) {
       filtered = filtered.filter(n => n.is_free === 1);
     }
     if (params.search) {
       const q = String(params.search).toLowerCase();
-      filtered = filtered.filter(n => n.title.toLowerCase().includes(q) || n.description.toLowerCase().includes(q) || n.chapter.toLowerCase().includes(q));
+      filtered = filtered.filter(
+        n =>
+          n.title.toLowerCase().includes(q) ||
+          n.description.toLowerCase().includes(q) ||
+          n.chapter.toLowerCase().includes(q) ||
+          (n.class_level && n.class_level.toLowerCase().includes(q)) ||
+          (n.exam && n.exam.toLowerCase().includes(q)) ||
+          (n.resource_type && n.resource_type.toLowerCase().includes(q))
+      );
     }
     if (params.sort === 'price_asc') {
       filtered.sort((a, b) => a.price - b.price);

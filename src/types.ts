@@ -11,12 +11,19 @@ export interface User {
   wishlistCount?: number;
 }
 
+export type ClassLevel = 'Class 8' | 'Class 9' | 'Class 10' | 'Class 11' | 'Class 12' | 'NEET';
+export type ExamTarget = 'School' | 'Board' | 'NEET' | 'CBSE' | 'General';
+export type ResourceCategory = 'Notes' | 'PYQs' | 'Question Bank' | 'Revision' | 'Study Material' | 'Test/Practice' | 'Formula Book' | 'Other';
+
 export interface Note {
   id: number;
   title: string;
   slug: string;
   description: string;
-  subject: 'Physics' | 'Chemistry' | 'Biology' | 'General NEET';
+  subject: string; // Supports Science, Mathematics, Social Science, English, Physics, Chemistry, Biology, etc.
+  class_level?: ClassLevel | string;
+  exam?: ExamTarget | string;
+  resource_type?: ResourceCategory | string;
   chapter: string;
   category_id: number;
   category_name?: string;
@@ -154,6 +161,7 @@ export interface DashboardStats {
   paidOrders: number;
   totalRevenue: number;
   totalDownloads: number;
+  classStats?: { class_level: string; count: number }[];
 }
 
 export interface SiteSettings {
