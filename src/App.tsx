@@ -201,7 +201,7 @@ export function App() {
   // Auth Handlers
   const handleAuthSuccess = (user: User) => {
     setCurrentUser(user);
-    if (user.role === 'admin') {
+    if (user.role === 'admin' && authMode === 'admin') {
       setCurrentView('admin');
     }
   };

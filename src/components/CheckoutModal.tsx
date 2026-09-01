@@ -13,8 +13,9 @@ import {
   AlertCircle,
   ExternalLink,
   ArrowRight,
-  Info,
-  ChevronRight,
+  Sparkles,
+  RefreshCw,
+  BookOpen,
 } from 'lucide-react';
 import { CartItem, User } from '../types';
 import { api } from '../services/api';
@@ -118,34 +119,40 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
-  const handlePayViaApp = (app: 'gpay' | 'phonepe') => {
-    setSelectedApp(app);
-    if (!orderDraft?.upiConfig) return;
-
-    let targetUrl = orderDraft.upiConfig.upiIntentUrl;
-    if (app === 'gpay' && orderDraft.upiConfig.gpayUrl) {
-      targetUrl = orderDraft.upiConfig.gpayUrl;
-    } else if (app === 'phonepe' && orderDraft.upiConfig.phonepeUrl) {
-      targetUrl = orderDraft.upiConfig.phonepeUrl;
+  const getAppIntentUrl = (app: 'gpay' | 'phonepe' | 'universal') => {
+    if (!orderDraft?.upiConfig) {
+      return `upi://pay?pa=neetnotes@icici&pn=NEET%20Notes%20HQ&am=${finalAmount.toFixed(2)}&cu=INR`;
     }
+    if (app === 'gpay') {
+      return orderDraft.upiConfig.gpayUrl || orderDraft.upiConfig.upiIntentUrl;
+    }
+    if (app === 'phonepe') {
+      return orderDraft.upiConfig.phonepeUrl || orderDraft.upiConfig.upiIntentUrl;
+    }
+    return orderDraft.upiConfig.upiIntentUrl;
+  };
 
+  const handleTriggerApp = (app: 'gpay' | 'phonepe') => {
+    setSelectedApp(app);
+    const targetUrl = getAppIntentUrl(app);
     try {
+      // Direct intent navigation for mobile browsers
       window.location.href = targetUrl;
     } catch (e) {
-      console.warn('Could not trigger direct app intent:', e);
+      console.warn('Could not launch direct intent protocol:', e);
     }
   };
 
-  const handleVerifyUpiPayment = async (e?: React.FormEvent) => {
+  const handleVerifyUpiPayment = async (e?: React.FormEvent, customUtr?: string) => {
     if (e) e.preventDefault();
     if (!orderDraft?.orderId) {
       setErrorMessage('Please initiate checkout order before verifying payment.');
       return;
     }
 
-    const cleanUtr = utrNumber.trim();
+    const cleanUtr = (customUtr || utrNumber).trim();
     if (!cleanUtr || cleanUtr.length < 6) {
-      setErrorMessage('Please enter the 12-digit UPI Reference / UTR Number from your GPay/PhonePe receipt.');
+      setErrorMessage('Please enter the 12-digit UPI Reference / UTR Number from your Google Pay or PhonePe receipt.');
       return;
     }
 
@@ -154,7 +161,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     try {
       const itemIds = items.map((i) => i.note.id);
-      const appLabel = selectedApp === 'gpay' ? 'Google Pay' : selectedApp === 'phonepe' ? 'PhonePe' : 'UPI QR';
+      const appLabel = selectedApp === 'gpay' ? 'Google Pay' : selectedApp === 'phonepe' ? 'PhonePe' : 'UPI Direct';
       const res = await api.verifyUpiPayment({
         orderId: orderDraft.orderId,
         utr: cleanUtr,
@@ -181,7 +188,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
-  const handleInstantClaimOrPay = async () => {
+  const handleInstantQuickUnlock = async () => {
     if (!user) {
       onOpenAuth();
       return;
@@ -207,7 +214,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         return;
       }
 
-      // If free order
       if (draft.isFree || finalAmount === 0) {
         setCompletedOrder({
           orderId: draft.orderId,
@@ -219,9 +225,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         return;
       }
 
-      // Quick 1-tap verification for normal GPay / PhonePe testing
+      // Generate a simulated 12-digit UTR for quick instant verification
       const simUtr = `98${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-      const appLabel = selectedApp === 'gpay' ? 'Google Pay' : selectedApp === 'phonepe' ? 'PhonePe' : 'UPI QR';
+      const appLabel = selectedApp === 'gpay' ? 'Google Pay' : selectedApp === 'phonepe' ? 'PhonePe' : 'UPI Direct';
       const verifyRes = await api.verifyUpiPayment({
         orderId: draft.orderId,
         utr: simUtr,
@@ -250,18 +256,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (!isOpen) return null;
 
+  const merchantUpi = orderDraft?.upiConfig?.merchantUpiId || 'neetnotes@icici';
+  const gpayUrl = getAppIntentUrl('gpay');
+  const phonepeUrl = getAppIntentUrl('phonepe');
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-6">
         {/* Header */}
-        <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-xs">
+        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-xs border border-emerald-500/30">
               UPI
             </div>
             <div>
-              <h2 className="text-sm sm:text-base font-bold">Google Pay & PhonePe Checkout</h2>
-              <p className="text-[11px] text-slate-400">Zero transaction fees • Instant PDF Unlock</p>
+              <h2 className="text-base font-bold">Google Pay & PhonePe Payment</h2>
+              <p className="text-[11px] text-slate-400">Direct instant transfer • 0% Transaction Fees</p>
             </div>
           </div>
           {!completedOrder && (
@@ -283,13 +293,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
               <div>
                 <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                  Payment Verified Successfully
+                  Payment Verified & Completed
                 </span>
                 <h3 className="text-xl font-black text-slate-900 mt-2">
-                  Notes Unlocked in Your Library!
+                  Study Notes Unlocked Successfully!
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Order ID: <strong className="text-slate-800">{completedOrder.orderNumber}</strong>
+                  Order Number: <strong className="text-slate-800">{completedOrder.orderNumber}</strong>
                 </p>
                 {completedOrder.maskedReference && (
                   <p className="text-[11px] text-slate-500 mt-0.5">
@@ -297,26 +307,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </p>
                 )}
                 {completedOrder.paymentMethod && (
-                  <p className="text-[11px] text-slate-400">Paid via: {completedOrder.paymentMethod}</p>
+                  <p className="text-[11px] text-slate-400">Payment App: {completedOrder.paymentMethod}</p>
                 )}
               </div>
 
-              <div className="bg-emerald-50/80 rounded-xl p-4 border border-emerald-200 text-left text-xs space-y-1.5">
+              <div className="bg-emerald-50/80 rounded-2xl p-4 border border-emerald-200 text-left text-xs space-y-1.5">
                 <div className="font-bold text-emerald-900 flex items-center gap-1.5">
                   <Zap className="w-4 h-4 text-emerald-600" />
-                  <span>Instant Access Ready:</span>
+                  <span>Access Granted to Student Library:</span>
                 </div>
                 <p className="text-slate-700 leading-relaxed">
-                  Your study materials have been added permanently to <strong>My Library</strong>. You can read online or download printable high-yield PDFs now.
+                  Your notes are now active in your student account. You can read online, view colored flowcharts, or download printable high-yield PDFs right away.
                 </p>
               </div>
 
               <button
                 id="checkout-success-library-btn"
-                onClick={onClose}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-600/25 transition-all text-sm cursor-pointer"
+                onClick={() => {
+                  onClose();
+                  onSuccess(completedOrder.orderId);
+                }}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-600/25 transition-all text-sm cursor-pointer flex items-center justify-center gap-2"
               >
-                Go to My Library & Download
+                <BookOpen className="w-4 h-4" />
+                <span>Open My Student Library & Read Notes</span>
               </button>
             </div>
           ) : !user ? (
@@ -326,7 +340,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
               <h3 className="text-base font-bold text-slate-900">Student Account Required</h3>
               <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                Please sign in or create an account so that study notes can be permanently linked to your student profile.
+                Please sign in or create an account so your study notes can be permanently saved in your Student Library.
               </p>
               <button
                 onClick={onOpenAuth}
@@ -345,10 +359,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </span>
                   <span className="text-[11px] text-slate-400">Instant PDF Access</span>
                 </div>
-                <div className="divide-y divide-slate-100 max-h-28 overflow-y-auto pr-1 bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
+                <div className="divide-y divide-slate-100 max-h-28 overflow-y-auto pr-1 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                   {items.map((it) => (
                     <div key={it.note.id} className="py-1.5 flex items-center justify-between text-xs first:pt-0 last:pb-0">
-                      <div className="truncate max-w-[220px]">
+                      <div className="truncate max-w-[260px]">
                         <span className="font-semibold text-slate-900">{it.note.title}</span>
                         <div className="text-[10px] text-slate-500">{it.note.subject} • {it.note.chapter}</div>
                       </div>
@@ -361,7 +375,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
 
               {/* Price Calculation Box */}
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1.5">
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
                 <div className="flex justify-between text-slate-600">
                   <span>Subtotal</span>
                   <span>₹{subtotal}</span>
@@ -373,159 +387,172 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </div>
                 )}
                 <div className="flex justify-between text-sm font-black text-slate-900 pt-1.5 border-t border-slate-200">
-                  <span>Payable Amount</span>
-                  <span className="text-emerald-700">₹{finalAmount}</span>
+                  <span>Total Amount to Pay</span>
+                  <span className="text-emerald-700 text-base">₹{finalAmount}</span>
                 </div>
               </div>
 
-              {finalAmount > 0 && (
-                <div className="space-y-3.5">
-                  {/* Dedicated GPay & PhonePe Buttons */}
-                  <div>
-                    <span className="text-xs font-bold text-slate-800 block mb-2">
-                      Choose Your Payment Method:
-                    </span>
+              {finalAmount > 0 ? (
+                <div className="space-y-4">
+                  {/* STEP 1: Direct Pay Buttons / QR Code */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">
+                          1
+                        </span>
+                        <span>Pay ₹{finalAmount} via Google Pay or PhonePe</span>
+                      </span>
+                    </div>
 
+                    {/* App Tabs / QR Switcher */}
                     <div className="grid grid-cols-3 gap-2">
-                      {/* Google Pay Option */}
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedApp('gpay');
-                          handlePayViaApp('gpay');
-                        }}
-                        className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-between cursor-pointer ${
+                        onClick={() => setSelectedApp('gpay')}
+                        className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                           selectedApp === 'gpay'
-                            ? 'border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-500/20 font-bold shadow-xs'
+                            ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-black ring-2 ring-emerald-500/20 shadow-xs'
                             : 'border-slate-200 text-slate-700 hover:border-slate-300 bg-white'
                         }`}
                       >
-                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-xs mb-1">
+                        <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-black">
                           GPay
                         </div>
                         <span className="text-xs font-extrabold">Google Pay</span>
-                        <span className="text-[9px] text-emerald-700 font-medium">1-Tap Mobile</span>
                       </button>
 
-                      {/* PhonePe Option */}
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedApp('phonepe');
-                          handlePayViaApp('phonepe');
-                        }}
-                        className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-between cursor-pointer ${
+                        onClick={() => setSelectedApp('phonepe')}
+                        className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                           selectedApp === 'phonepe'
-                            ? 'border-purple-600 bg-purple-50 text-purple-950 ring-2 ring-purple-500/20 font-bold shadow-xs'
+                            ? 'border-purple-600 bg-purple-50 text-purple-950 font-black ring-2 ring-purple-500/20 shadow-xs'
                             : 'border-slate-200 text-slate-700 hover:border-slate-300 bg-white'
                         }`}
                       >
-                        <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-black text-xs mb-1">
+                        <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-black">
                           Pe
                         </div>
                         <span className="text-xs font-extrabold">PhonePe</span>
-                        <span className="text-[9px] text-purple-700 font-medium">1-Tap Mobile</span>
                       </button>
 
-                      {/* Scan QR Option */}
                       <button
                         type="button"
                         onClick={() => setSelectedApp('qr')}
-                        className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-between cursor-pointer ${
+                        className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                           selectedApp === 'qr'
-                            ? 'border-slate-900 bg-slate-100 text-slate-950 ring-2 ring-slate-400/20 font-bold shadow-xs'
+                            ? 'border-slate-900 bg-slate-100 text-slate-950 font-black ring-2 ring-slate-400/20 shadow-xs'
                             : 'border-slate-200 text-slate-700 hover:border-slate-300 bg-white'
                         }`}
                       >
-                        <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center mb-1">
+                        <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-xs">
                           <QrCode className="w-4 h-4" />
                         </div>
                         <span className="text-xs font-extrabold">Scan QR</span>
-                        <span className="text-[9px] text-slate-500 font-medium">Desktop/Phone</span>
                       </button>
                     </div>
-                  </div>
 
-                  {/* QR Code or UPI Intent Card */}
-                  {selectedApp === 'qr' ? (
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center space-y-2">
-                      <div className="flex items-center justify-between text-xs px-1">
-                        <span className="font-bold text-slate-800">Scan via Google Pay / PhonePe</span>
-                        <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                          ₹{finalAmount}
-                        </span>
-                      </div>
-
-                      <div className="inline-block p-2 bg-white rounded-xl shadow-xs border border-slate-200 mx-auto">
-                        {qrDataUrl ? (
-                          <img
-                            src={qrDataUrl}
-                            alt="Scan UPI QR Code"
-                            className="w-40 h-40 mx-auto"
-                          />
-                        ) : (
-                          <div className="w-40 h-40 flex items-center justify-center text-slate-400 text-xs animate-pulse">
-                            Loading QR Code...
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="text-[11px] text-slate-500">
-                        Open <strong>Google Pay</strong> or <strong>PhonePe</strong> on your phone & scan this QR.
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                          <Smartphone className="w-4 h-4 text-emerald-600" />
-                          <span>Direct {selectedApp === 'gpay' ? 'Google Pay' : 'PhonePe'} Launch</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handlePayViaApp(selectedApp)}
-                          className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-0.5 cursor-pointer"
-                        >
-                          <span>Open App</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </button>
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-relaxed">
-                        On mobile, clicking &quot;Open App&quot; or the buttons above will launch your payment app with ₹{finalAmount} pre-filled.
-                      </p>
-                      
-                      {/* Protected Merchant UPI ID (Masked) */}
-                      <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs">
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">UPI ID (VPA)</span>
-                          <span className="font-bold text-slate-800 font-mono text-xs">
-                            {orderDraft?.upiConfig?.maskedUpiId || 'ne****@icici'}
+                    {/* Active Mode Details */}
+                    {selectedApp === 'qr' ? (
+                      /* Live QR Code Display */
+                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center space-y-2">
+                        <div className="flex items-center justify-between text-xs px-1">
+                          <span className="font-bold text-slate-800">Scan using Google Pay or PhonePe</span>
+                          <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            ₹{finalAmount}
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleCopyUpiId}
-                          className="px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50 rounded transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          {copiedUpi ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                          <span>{copiedUpi ? 'Copied' : 'Copy'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
 
-                  {/* 12-digit UTR Verification */}
-                  <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-xl p-3.5 space-y-2">
+                        <div className="inline-block p-2 bg-white rounded-xl shadow-xs border border-slate-200 mx-auto">
+                          {qrDataUrl ? (
+                            <img
+                              src={qrDataUrl}
+                              alt="Scan UPI QR Code"
+                              className="w-44 h-44 mx-auto"
+                            />
+                          ) : (
+                            <div className="w-44 h-44 flex items-center justify-center text-slate-400 text-xs animate-pulse">
+                              Generating Live QR...
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="text-[11px] text-slate-500">
+                          Scan with your <strong>Google Pay</strong> or <strong>PhonePe</strong> app on mobile to pay <strong>₹{finalAmount}</strong>.
+                        </div>
+                      </div>
+                    ) : (
+                      /* Direct App Trigger Box */
+                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 font-bold text-slate-900">
+                            <Smartphone className="w-4 h-4 text-emerald-600" />
+                            <span>{selectedApp === 'gpay' ? 'Google Pay' : 'PhonePe'} Direct Launch</span>
+                          </div>
+                          <span className="text-[10px] text-emerald-800 bg-emerald-100 font-bold px-2 py-0.5 rounded">
+                            Mobile App
+                          </span>
+                        </div>
+
+                        {/* Direct Native Link Button */}
+                        <div className="grid grid-cols-1 gap-2">
+                          <a
+                            href={selectedApp === 'gpay' ? gpayUrl : phonepeUrl}
+                            onClick={() => handleTriggerApp(selectedApp)}
+                            className={`w-full py-3 px-4 rounded-xl text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer ${
+                              selectedApp === 'gpay'
+                                ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                                : 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20'
+                            }`}
+                          >
+                            <span>Open {selectedApp === 'gpay' ? 'Google Pay' : 'PhonePe'} & Pay ₹{finalAmount}</span>
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        </div>
+
+                        <p className="text-[11px] text-slate-500 text-center">
+                          (If tapping the button doesn&apos;t open your app on desktop or iPhone, copy the UPI ID below or scan the QR Code).
+                        </p>
+
+                        {/* Copy Merchant UPI ID */}
+                        <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs">
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-medium">Merchant UPI ID (VPA)</span>
+                            <span className="font-black text-slate-800 font-mono text-xs">{merchantUpi}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleCopyUpiId}
+                            className="px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-1 cursor-pointer border border-emerald-200"
+                          >
+                            {copiedUpi ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedUpi ? 'Copied!' : 'Copy UPI ID'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* STEP 2: Enter UTR / Reference ID */}
+                  <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 space-y-2.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-900">Enter UPI Reference / UTR Number</span>
-                      <span className="text-[10px] text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded font-bold">
-                        Verification
+                      <span className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">
+                          2
+                        </span>
+                        <span>Enter 12-Digit UTR / Ref No. to Unlock</span>
+                      </span>
+                      <span className="text-[10px] text-emerald-800 bg-emerald-100 font-bold px-2 py-0.5 rounded">
+                        Final Step
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600">
-                      After sending ₹{finalAmount} in Google Pay / PhonePe, enter the <strong>12-digit UTR</strong> from your app receipt:
+
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      After sending payment in Google Pay / PhonePe, find the <strong>12-digit UPI Reference Number / UTR</strong> in the receipt and enter it here:
                     </p>
+
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -533,20 +560,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         onChange={(e) => setUtrNumber(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
                         placeholder="e.g. 429381928374"
                         maxLength={18}
-                        className="flex-1 text-xs px-3 py-2 bg-white rounded-lg border border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none font-mono"
+                        className="flex-1 text-xs px-3.5 py-2.5 bg-white rounded-xl border border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none font-mono font-bold text-slate-800"
                       />
                       <button
                         type="button"
                         disabled={isVerifyingUpi || !utrNumber.trim()}
                         onClick={() => handleVerifyUpiPayment()}
-                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-all cursor-pointer shrink-0"
+                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black px-4 py-2.5 rounded-xl transition-all cursor-pointer shrink-0 shadow-md shadow-emerald-600/20"
                       >
-                        {isVerifyingUpi ? 'Verifying...' : 'Verify UTR'}
+                        {isVerifyingUpi ? 'Verifying...' : 'Verify & Unlock'}
                       </button>
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {errorMessage && (
                 <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium flex items-center gap-2">
@@ -555,29 +582,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               )}
 
-              {/* Main Quick Unlock Button */}
-              <div className="space-y-2 pt-1">
+              {/* Instant 1-Click Verification / Direct Claim */}
+              <div className="space-y-2 pt-1 border-t border-slate-100">
                 <button
-                  id="pay-now-btn"
+                  id="instant-pay-unlock-btn"
                   disabled={isProcessing || isVerifyingUpi}
-                  onClick={handleInstantClaimOrPay}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
+                  onClick={handleInstantQuickUnlock}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer text-xs shadow-md"
                 >
-                  {isProcessing ? (
-                    <span>Unlocking Notes & Verifying...</span>
-                  ) : finalAmount === 0 ? (
-                    <span>Claim Free Study Notes Directly</span>
-                  ) : (
-                    <span>Instant 1-Click Unlock (₹{finalAmount})</span>
-                  )}
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  <span>
+                    {isProcessing
+                      ? 'Unlocking Notes...'
+                      : finalAmount === 0
+                      ? 'Claim Free Notes Now'
+                      : `Instant 1-Click Test Unlock (₹${finalAmount})`}
+                  </span>
                 </button>
 
                 <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
                   <div className="flex items-center gap-1">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Protected UPI Flow</span>
+                    <span>Protected UPI Verification</span>
                   </div>
-                  <span>Instant Student Library Access</span>
+                  <span>Student Library Safe • Instant Delivery</span>
                 </div>
               </div>
             </>
