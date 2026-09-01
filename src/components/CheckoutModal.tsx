@@ -39,7 +39,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOpenAuth,
   onSuccess,
 }) => {
-  const [selectedApp, setSelectedApp] = useState<'gpay' | 'phonepe' | 'qr'>('gpay');
+  const [selectedApp, setSelectedApp] = useState<'gpay' | 'phonepe' | 'paytm' | 'qr'>('gpay');
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [completedOrder, setCompletedOrder] = useState<any>(null);
@@ -69,10 +69,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const merchantName = orderDraft?.upiConfig?.merchantName || 'NEET Notes HQ';
   const orderRef = orderDraft?.orderNumber || `ORD${Date.now().toString().slice(-6)}`;
 
-  // Standard universal UPI URI with exact real-time amount
+  // Standard universal UPI and app-specific intent URIs
   const universalUpiUrl = `upi://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
   const gpayUrl = `upi://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
   const phonepeUrl = `phonepe://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
+  const paytmUrl = `paytmmp://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
 
   // Initialize or fetch secure order draft when opening modal
   useEffect(() => {
@@ -87,7 +88,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [isOpen, user, items, appliedCoupon, finalAmount]);
 
-  // Generate dynamic QR Code for standard Google Pay / PhonePe scanning whenever finalAmount or merchant details change
+  // Generate dynamic QR Code for standard Google Pay / PhonePe / Paytm scanning
   useEffect(() => {
     if (isOpen && finalAmount > 0) {
       QRCode.toDataURL(universalUpiUrl, {
@@ -131,25 +132,39 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
-  const getAppIntentUrl = (app: 'gpay' | 'phonepe' | 'universal') => {
+  const getAppIntentUrl = (app: 'gpay' | 'phonepe' | 'paytm' | 'qr') => {
     if (app === 'phonepe') return phonepeUrl;
+    if (app === 'paytm') return paytmUrl;
     if (app === 'gpay') return gpayUrl;
     return universalUpiUrl;
   };
 
-  const handleTriggerApp = (app: 'gpay' | 'phonepe') => {
+  const handleTriggerApp = (app: 'gpay' | 'phonepe' | 'paytm', e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setSelectedApp(app);
     const targetUrl = getAppIntentUrl(app);
     try {
-      // Direct intent navigation for mobile browsers
-      window.location.href = targetUrl;
+      // Attempt clean direct intent launch without navigating page away from checkout modal
+      const link = document.createElement('a');
+      link.href = targetUrl;
+      link.rel = 'noopener noreferrer';
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (e) {
       console.warn('Could not launch direct intent protocol:', e);
     }
   };
 
   const handleVerifyUpiPayment = async (e?: React.FormEvent, customUtr?: string) => {
-    if (e) e.preventDefault();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!orderDraft?.orderId) {
       setErrorMessage('Please initiate checkout order before verifying payment.');
       return;
@@ -157,7 +172,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     const cleanUtr = (customUtr || utrNumber).trim();
     if (!cleanUtr || cleanUtr.length < 6) {
-      setErrorMessage('Please enter the 12-digit UPI Reference / UTR Number from your Google Pay or PhonePe receipt.');
+      setErrorMessage('Please enter the 12-digit UPI Reference / UTR Number from your payment receipt.');
       return;
     }
 
@@ -166,7 +181,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     try {
       const itemIds = items.map((i) => i.note.id);
-      const appLabel = selectedApp === 'gpay' ? 'Google Pay' : selectedApp === 'phonepe' ? 'PhonePe' : 'UPI Direct';
+      const appLabel =
+        selectedApp === 'gpay'
+          ? 'Google Pay'
+          : selectedApp === 'phonepe'
+          ? 'PhonePe'
+          : selectedApp === 'paytm'
+          ? 'Paytm'
+          : 'UPI Direct';
+
       const res = await api.verifyUpiPayment({
         orderId: orderDraft.orderId,
         utr: cleanUtr,
@@ -182,7 +205,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           maskedReference: res.maskedReference || `****${cleanUtr.slice(-4)}`,
           paymentMethod: appLabel,
         });
-        onSuccess(orderDraft.orderId);
       } else {
         setErrorMessage(res.message || 'Payment verification failed. Please check the UTR number.');
       }
@@ -193,7 +215,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
-  const handleInstantQuickUnlock = async () => {
+  const handleInstantQuickUnlock = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!user) {
       onOpenAuth();
       return;
@@ -210,6 +236,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         draft = await api.createPaymentOrder({
           items: noteIds,
           coupon_code: appliedCoupon?.code,
+          amount: finalAmount,
         });
       }
 
@@ -225,14 +252,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           orderNumber: draft.orderNumber,
           isFree: true,
         });
-        onSuccess(draft.orderId);
         setIsProcessing(false);
         return;
       }
 
-      // Generate a simulated 12-digit UTR for quick instant verification
+      // Generate a simulated 12-digit UTR for quick test verification
       const simUtr = `98${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-      const appLabel = selectedApp === 'gpay' ? 'Google Pay' : selectedApp === 'phonepe' ? 'PhonePe' : 'UPI Direct';
+      const appLabel =
+        selectedApp === 'gpay'
+          ? 'Google Pay'
+          : selectedApp === 'phonepe'
+          ? 'PhonePe'
+          : selectedApp === 'paytm'
+          ? 'Paytm'
+          : 'UPI Direct';
+
       const verifyRes = await api.verifyUpiPayment({
         orderId: draft.orderId,
         utr: simUtr,
@@ -248,7 +282,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           maskedReference: `****${simUtr.slice(-4)}`,
           paymentMethod: appLabel,
         });
-        onSuccess(draft.orderId);
       } else {
         setErrorMessage(verifyRes.message || 'Payment verification failed.');
       }
@@ -256,6 +289,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setErrorMessage(err.message || 'An unexpected error occurred during checkout.');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleFinishAndOpenLibrary = () => {
+    if (completedOrder) {
+      onSuccess(completedOrder.orderId);
+      onClose();
     }
   };
 
@@ -324,10 +364,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
               <button
                 id="checkout-success-library-btn"
-                onClick={() => {
-                  onClose();
-                  onSuccess(completedOrder.orderId);
-                }}
+                onClick={handleFinishAndOpenLibrary}
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-600/25 transition-all text-sm cursor-pointer flex items-center justify-center gap-2"
               >
                 <BookOpen className="w-4 h-4" />
@@ -402,55 +439,70 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">
                           1
                         </span>
-                        <span>Pay ₹{finalAmount} via Google Pay or PhonePe</span>
+                        <span>Pay ₹{finalAmount} via UPI App or QR Code</span>
                       </span>
                     </div>
 
                     {/* App Tabs / QR Switcher */}
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                       <button
                         type="button"
                         onClick={() => setSelectedApp('gpay')}
-                        className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                        className={`p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                           selectedApp === 'gpay'
                             ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-black ring-2 ring-emerald-500/20 shadow-xs'
                             : 'border-slate-200 text-slate-700 hover:border-slate-300 bg-white'
                         }`}
                       >
-                        <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-black">
+                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[11px] sm:text-xs font-black">
                           GPay
                         </div>
-                        <span className="text-xs font-extrabold">Google Pay</span>
+                        <span className="text-[11px] sm:text-xs font-extrabold truncate w-full">Google Pay</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setSelectedApp('phonepe')}
-                        className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                        className={`p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                           selectedApp === 'phonepe'
                             ? 'border-purple-600 bg-purple-50 text-purple-950 font-black ring-2 ring-purple-500/20 shadow-xs'
                             : 'border-slate-200 text-slate-700 hover:border-slate-300 bg-white'
                         }`}
                       >
-                        <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-black">
+                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[11px] sm:text-xs font-black">
                           Pe
                         </div>
-                        <span className="text-xs font-extrabold">PhonePe</span>
+                        <span className="text-[11px] sm:text-xs font-extrabold truncate w-full">PhonePe</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedApp('paytm')}
+                        className={`p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                          selectedApp === 'paytm'
+                            ? 'border-sky-600 bg-sky-50 text-sky-950 font-black ring-2 ring-sky-500/20 shadow-xs'
+                            : 'border-slate-200 text-slate-700 hover:border-slate-300 bg-white'
+                        }`}
+                      >
+                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-[10px] sm:text-xs font-black">
+                          Paytm
+                        </div>
+                        <span className="text-[11px] sm:text-xs font-extrabold truncate w-full">Paytm</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setSelectedApp('qr')}
-                        className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                        className={`p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                           selectedApp === 'qr'
                             ? 'border-slate-900 bg-slate-100 text-slate-950 font-black ring-2 ring-slate-400/20 shadow-xs'
                             : 'border-slate-200 text-slate-700 hover:border-slate-300 bg-white'
                         }`}
                       >
-                        <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-xs">
-                          <QrCode className="w-4 h-4" />
+                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-xs">
+                          <QrCode className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </div>
-                        <span className="text-xs font-extrabold">Scan QR</span>
+                        <span className="text-[11px] sm:text-xs font-extrabold truncate w-full">Scan QR</span>
                       </button>
                     </div>
 
@@ -459,7 +511,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       /* Live QR Code Display */
                       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center space-y-2">
                         <div className="flex items-center justify-between text-xs px-1">
-                          <span className="font-bold text-slate-800">Scan using Google Pay or PhonePe</span>
+                          <span className="font-bold text-slate-800">Scan using any UPI App (GPay / PhonePe / Paytm)</span>
                           <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                             ₹{finalAmount}
@@ -481,7 +533,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         </div>
 
                         <div className="text-[11px] text-slate-500">
-                          Scan with your <strong>Google Pay</strong> or <strong>PhonePe</strong> app on mobile to pay <strong>₹{finalAmount}</strong>.
+                          Scan with your <strong>Google Pay</strong>, <strong>PhonePe</strong>, or <strong>Paytm</strong> app to pay <strong>₹{finalAmount}</strong>.
                         </div>
                       </div>
                     ) : (
@@ -490,7 +542,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2 font-bold text-slate-900">
                             <Smartphone className="w-4 h-4 text-emerald-600" />
-                            <span>{selectedApp === 'gpay' ? 'Google Pay' : 'PhonePe'} Direct Launch</span>
+                            <span>
+                              {selectedApp === 'gpay'
+                                ? 'Google Pay'
+                                : selectedApp === 'phonepe'
+                                ? 'PhonePe'
+                                : 'Paytm'}{' '}
+                              Direct Launch
+                            </span>
                           </div>
                           <span className="text-[10px] text-emerald-800 bg-emerald-100 font-bold px-2 py-0.5 rounded">
                             Mobile App
@@ -499,18 +558,28 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                         {/* Direct Native Link Button */}
                         <div className="grid grid-cols-1 gap-2">
-                          <a
-                            href={selectedApp === 'gpay' ? gpayUrl : phonepeUrl}
-                            onClick={() => handleTriggerApp(selectedApp)}
+                          <button
+                            type="button"
+                            onClick={(e) => handleTriggerApp(selectedApp, e)}
                             className={`w-full py-3 px-4 rounded-xl text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer ${
                               selectedApp === 'gpay'
                                 ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
-                                : 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20'
+                                : selectedApp === 'phonepe'
+                                ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20'
+                                : 'bg-sky-600 hover:bg-sky-700 shadow-sky-600/20'
                             }`}
                           >
-                            <span>Open {selectedApp === 'gpay' ? 'Google Pay' : 'PhonePe'} & Pay ₹{finalAmount}</span>
+                            <span>
+                              Open{' '}
+                              {selectedApp === 'gpay'
+                                ? 'Google Pay'
+                                : selectedApp === 'phonepe'
+                                ? 'PhonePe'
+                                : 'Paytm'}{' '}
+                              & Pay ₹{finalAmount}
+                            </span>
                             <ExternalLink className="w-4 h-4" />
-                          </a>
+                          </button>
                         </div>
 
                         <p className="text-[11px] text-slate-500 text-center">
