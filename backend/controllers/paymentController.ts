@@ -261,7 +261,7 @@ export async function createCheckoutOrder(req: AuthRequest, res: Response) {
       });
     }
 
-    const merchantUpiId = process.env.MERCHANT_UPI_ID || 'neetnotes@icici';
+    const merchantUpiId = process.env.MERCHANT_UPI_ID || 'akifq027-1@okhdfcbank';
     const merchantName = process.env.MERCHANT_NAME || 'NEET Notes HQ';
     const upiNoteText = encodeURIComponent(`Notes Order ${orderNumber}`);
     const upiIntentUrl = `upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${totalAmount.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
@@ -269,11 +269,11 @@ export async function createCheckoutOrder(req: AuthRequest, res: Response) {
     const phonepeUrl = `phonepe://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${totalAmount.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
     const paytmUrl = `paytmmp://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${totalAmount.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
 
-    // Mask merchant UPI ID for security
+    // Mask merchant UPI ID for display
     const upiParts = merchantUpiId.split('@');
     const maskedUpiId = upiParts.length === 2
-      ? `${upiParts[0].slice(0, 2)}***${upiParts[0].slice(-1)}@${upiParts[1]}`
-      : 'neet***@upi';
+      ? `${upiParts[0].slice(0, 3)}***${upiParts[0].slice(-2)}@${upiParts[1]}`
+      : 'akif***@okhdfcbank';
 
     return res.json({
       success: true,

@@ -92,7 +92,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         // Generate dynamic QR Code for standard Google Pay / PhonePe scanning
         const intentUrl =
           res.upiConfig?.upiIntentUrl ||
-          `upi://pay?pa=neetnotes@icici&pn=NEET%20Notes%20HQ&am=${finalAmount.toFixed(2)}&cu=INR`;
+          `upi://pay?pa=akifq027-1@okhdfcbank&pn=NEET%20Notes%20HQ&am=${finalAmount.toFixed(2)}&cu=INR`;
         try {
           const qrUrl = await QRCode.toDataURL(intentUrl, {
             width: 260,
@@ -113,7 +113,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleCopyUpiId = () => {
-    const upiToCopy = orderDraft?.upiConfig?.merchantUpiId || 'neetnotes@icici';
+    const upiToCopy = orderDraft?.upiConfig?.merchantUpiId || 'akifq027-1@okhdfcbank';
     navigator.clipboard.writeText(upiToCopy);
     setCopiedUpi(true);
     setTimeout(() => setCopiedUpi(false), 2000);
@@ -121,7 +121,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const getAppIntentUrl = (app: 'gpay' | 'phonepe' | 'universal') => {
     if (!orderDraft?.upiConfig) {
-      return `upi://pay?pa=neetnotes@icici&pn=NEET%20Notes%20HQ&am=${finalAmount.toFixed(2)}&cu=INR`;
+      return `upi://pay?pa=akifq027-1@okhdfcbank&pn=NEET%20Notes%20HQ&am=${finalAmount.toFixed(2)}&cu=INR`;
     }
     if (app === 'gpay') {
       return orderDraft.upiConfig.gpayUrl || orderDraft.upiConfig.upiIntentUrl;
@@ -256,7 +256,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (!isOpen) return null;
 
-  const merchantUpi = orderDraft?.upiConfig?.merchantUpiId || 'neetnotes@icici';
+  const merchantUpi = orderDraft?.upiConfig?.merchantUpiId || 'akifq027-1@okhdfcbank';
   const gpayUrl = getAppIntentUrl('gpay');
   const phonepeUrl = getAppIntentUrl('phonepe');
 

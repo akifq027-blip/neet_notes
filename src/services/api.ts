@@ -671,7 +671,7 @@ export const api = {
     const orderId = Date.now();
     const orderNumber = `ORD-NEET-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
 
-    const merchantUpiId = 'neetnotes@icici';
+    const merchantUpiId = 'akifq027-1@okhdfcbank';
     const merchantName = 'NEET Notes HQ';
     const upiNoteText = encodeURIComponent(`Notes Order ${orderNumber}`);
     const upiIntentUrl = `upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${subtotal.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
@@ -692,7 +692,7 @@ export const api = {
       isLiveRazorpay: false,
       upiConfig: {
         merchantUpiId,
-        maskedUpiId: 'ne****@icici',
+        maskedUpiId: 'akif***@okhdfcbank',
         merchantName,
         upiIntentUrl,
         gpayUrl,
