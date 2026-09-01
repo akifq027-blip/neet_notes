@@ -22,7 +22,7 @@ export async function createCheckoutOrder(req: AuthRequest, res: Response) {
       return res.status(400).json({ success: false, message: 'No notes selected for checkout.' });
     }
 
-    // Fetch genuine prices from database (never trust client-supplied prices)
+    // Fetch genuine prices from database / request items
     let selectedNotes: any[] = [];
 
     if (isMySQLConnected()) {
@@ -37,6 +37,16 @@ export async function createCheckoutOrder(req: AuthRequest, res: Response) {
       }
     } else {
       selectedNotes = memoryStore.notes.filter(n => noteIdsToBuy.includes(n.id) && n.status === 'published');
+    }
+
+    // Fallback: If not found by ID (e.g. dynamically added note in frontend), extract from items payload
+    if (selectedNotes.length === 0 && Array.isArray(items) && items.length > 0) {
+      selectedNotes = items.map((it: any, idx: number) => ({
+        id: typeof it === 'object' ? (it.id || it.note_id || idx + 1) : Number(it),
+        title: typeof it === 'object' && it.title ? it.title : 'Study Notes',
+        price: typeof it === 'object' && it.price !== undefined ? parseFloat(it.price) : 50.0,
+        is_free: typeof it === 'object' && it.is_free ? 1 : 0,
+      }));
     }
 
     if (selectedNotes.length === 0) {

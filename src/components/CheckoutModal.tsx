@@ -64,6 +64,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   }
 
   const finalAmount = Math.max(0, subtotal - discount);
+  const formattedAmount = finalAmount.toFixed(2);
+  const merchantUpi = orderDraft?.upiConfig?.merchantUpiId || 'akifq027-1@okhdfcbank';
+  const merchantName = orderDraft?.upiConfig?.merchantName || 'NEET Notes HQ';
+  const orderRef = orderDraft?.orderNumber || `ORD${Date.now().toString().slice(-6)}`;
+
+  // Standard universal UPI URI with exact real-time amount
+  const universalUpiUrl = `upi://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
+  const gpayUrl = `upi://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
+  const phonepeUrl = `phonepe://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
 
   // Initialize or fetch secure order draft when opening modal
   useEffect(() => {
@@ -76,36 +85,40 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setErrorMessage('');
       setUtrNumber('');
     }
-  }, [isOpen, user, items, appliedCoupon]);
+  }, [isOpen, user, items, appliedCoupon, finalAmount]);
+
+  // Generate dynamic QR Code for standard Google Pay / PhonePe scanning whenever finalAmount or merchant details change
+  useEffect(() => {
+    if (isOpen && finalAmount > 0) {
+      QRCode.toDataURL(universalUpiUrl, {
+        width: 260,
+        margin: 2,
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff',
+        },
+      })
+        .then((url) => setQrDataUrl(url))
+        .catch((qrErr) => console.error('Failed to render QR Code:', qrErr));
+    }
+  }, [isOpen, finalAmount, universalUpiUrl]);
 
   const initOrderDraft = async () => {
     try {
-      const noteIds = items.map((i) => i.note.id);
       const res = await api.createPaymentOrder({
-        items: noteIds,
+        items: items.map((i) => ({
+          note_id: i.note.id,
+          id: i.note.id,
+          price: i.note.price,
+          title: i.note.title,
+          is_free: i.note.is_free,
+        })),
+        amount: finalAmount,
         coupon_code: appliedCoupon?.code,
       });
 
       if (res && res.success) {
         setOrderDraft(res);
-
-        // Generate dynamic QR Code for standard Google Pay / PhonePe scanning
-        const intentUrl =
-          res.upiConfig?.upiIntentUrl ||
-          `upi://pay?pa=akifq027-1@okhdfcbank&pn=NEET%20Notes%20HQ&am=${finalAmount.toFixed(2)}&cu=INR`;
-        try {
-          const qrUrl = await QRCode.toDataURL(intentUrl, {
-            width: 260,
-            margin: 2,
-            color: {
-              dark: '#0f172a',
-              light: '#ffffff',
-            },
-          });
-          setQrDataUrl(qrUrl);
-        } catch (qrErr) {
-          console.error('Failed to render QR Code:', qrErr);
-        }
       }
     } catch (err: any) {
       console.error('Error generating order draft:', err);
@@ -113,23 +126,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleCopyUpiId = () => {
-    const upiToCopy = orderDraft?.upiConfig?.merchantUpiId || 'akifq027-1@okhdfcbank';
-    navigator.clipboard.writeText(upiToCopy);
+    navigator.clipboard.writeText(merchantUpi);
     setCopiedUpi(true);
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
   const getAppIntentUrl = (app: 'gpay' | 'phonepe' | 'universal') => {
-    if (!orderDraft?.upiConfig) {
-      return `upi://pay?pa=akifq027-1@okhdfcbank&pn=NEET%20Notes%20HQ&am=${finalAmount.toFixed(2)}&cu=INR`;
-    }
-    if (app === 'gpay') {
-      return orderDraft.upiConfig.gpayUrl || orderDraft.upiConfig.upiIntentUrl;
-    }
-    if (app === 'phonepe') {
-      return orderDraft.upiConfig.phonepeUrl || orderDraft.upiConfig.upiIntentUrl;
-    }
-    return orderDraft.upiConfig.upiIntentUrl;
+    if (app === 'phonepe') return phonepeUrl;
+    if (app === 'gpay') return gpayUrl;
+    return universalUpiUrl;
   };
 
   const handleTriggerApp = (app: 'gpay' | 'phonepe') => {
@@ -255,10 +260,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   if (!isOpen) return null;
-
-  const merchantUpi = orderDraft?.upiConfig?.merchantUpiId || 'akifq027-1@okhdfcbank';
-  const gpayUrl = getAppIntentUrl('gpay');
-  const phonepeUrl = getAppIntentUrl('phonepe');
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">

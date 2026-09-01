@@ -648,7 +648,7 @@ export const api = {
   },
 
   // Checkout & Orders
-  async createPaymentOrder(data: { items?: any[]; note_id?: number; coupon_code?: string }): Promise<any> {
+  async createPaymentOrder(data: { items?: any[]; note_id?: number; coupon_code?: string; amount?: number }): Promise<any> {
     const result = await safeFetch(`${API_BASE}/payment/create-order`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -660,14 +660,24 @@ export const api = {
     }
 
     // Local fallback order generation with secure masked UPI config
-    const rawNoteIds: number[] = Array.isArray(data.items)
-      ? data.items.map(i => (typeof i === 'object' ? i.id || i.note_id : Number(i))).filter(Boolean)
-      : data.note_id ? [Number(data.note_id)] : [1];
+    let subtotal = 0;
+    if (typeof data.amount === 'number' && !isNaN(data.amount)) {
+      subtotal = data.amount;
+    } else if (Array.isArray(data.items) && data.items.length > 0) {
+      const allNotes = getFallbackNotes();
+      subtotal = data.items.reduce((sum, it) => {
+        if (typeof it === 'object' && it.price !== undefined) {
+          return sum + (it.is_free ? 0 : Number(it.price) || 0);
+        }
+        const found = allNotes.find(n => n.id === Number(it));
+        return sum + (found ? (found.is_free ? 0 : Number(found.price) || 0) : 0);
+      }, 0);
+    } else if (data.note_id) {
+      const allNotes = getFallbackNotes();
+      const found = allNotes.find(n => n.id === Number(data.note_id));
+      subtotal = found ? (found.is_free ? 0 : Number(found.price) || 0) : 50;
+    }
 
-    const allNotes = getFallbackNotes();
-    const selectedNotes = allNotes.filter(n => rawNoteIds.includes(n.id));
-    const finalNotes = selectedNotes.length > 0 ? selectedNotes : [allNotes[0]];
-    const subtotal = finalNotes.reduce((sum, n) => sum + (n.is_free ? 0 : Number(n.price) || 0), 0);
     const orderId = Date.now();
     const orderNumber = `ORD-NEET-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
 
@@ -675,7 +685,7 @@ export const api = {
     const merchantName = 'NEET Notes HQ';
     const upiNoteText = encodeURIComponent(`Notes Order ${orderNumber}`);
     const upiIntentUrl = `upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${subtotal.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
-    const gpayUrl = `gpay://upi/pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${subtotal.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
+    const gpayUrl = `upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${subtotal.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
     const phonepeUrl = `phonepe://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${subtotal.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
     const paytmUrl = `paytmmp://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${subtotal.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
 
