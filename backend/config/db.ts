@@ -702,9 +702,9 @@ export async function initDatabase() {
   ];
 
   memoryStore.coupons = [
-    { id: 1, code: 'NEET20', description: 'Special 20% discount on all notes and question banks', discount_type: 'percentage', discount_value: 20.00, minimum_amount: 99.00, usage_limit: 1000, times_used: 42, expiry_date: '2026-12-31', active: 1 },
-    { id: 2, code: 'BIOLOGY50', description: 'Flat Rs. 50 OFF on Biology Master Modules', discount_type: 'fixed', discount_value: 50.00, minimum_amount: 150.00, usage_limit: 500, times_used: 19, expiry_date: '2026-12-31', active: 1 },
-    { id: 3, code: 'FIRSTBUY', description: 'Flat 15% discount for first-time NEET aspirants', discount_type: 'percentage', discount_value: 15.00, minimum_amount: 49.00, usage_limit: 2000, times_used: 88, expiry_date: '2026-12-31', active: 1 },
+    { id: 1, code: 'NEET20', description: 'Special 20% discount on all notes and question banks', discount_type: 'percentage', discount_value: 20.00, minimum_amount: 0.00, usage_limit: 1000, times_used: 42, expiry_date: '2026-12-31', active: 1 },
+    { id: 2, code: 'BIOLOGY50', description: 'Flat Rs. 50 OFF on Biology Master Modules', discount_type: 'fixed', discount_value: 50.00, minimum_amount: 0.00, usage_limit: 500, times_used: 19, expiry_date: '2026-12-31', active: 1 },
+    { id: 3, code: 'FIRSTBUY', description: 'Flat 15% discount for first-time NEET aspirants', discount_type: 'percentage', discount_value: 15.00, minimum_amount: 0.00, usage_limit: 2000, times_used: 88, expiry_date: '2026-12-31', active: 1 },
   ];
 
   memoryStore.reviews = [

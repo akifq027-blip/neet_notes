@@ -919,7 +919,9 @@ export const AdminDashboard: React.FC = () => {
                   <input
                     name="price"
                     type="number"
-                    defaultValue={editingNote?.price ?? 79}
+                    min="0"
+                    step="any"
+                    defaultValue={editingNote?.price ?? 1}
                     className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none"
                   />
                 </div>
@@ -929,7 +931,9 @@ export const AdminDashboard: React.FC = () => {
                   <input
                     name="original_price"
                     type="number"
-                    defaultValue={editingNote?.original_price ?? 149}
+                    min="0"
+                    step="any"
+                    defaultValue={editingNote?.original_price ?? 49}
                     className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none"
                   />
                 </div>

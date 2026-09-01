@@ -1179,8 +1179,8 @@ export const api = {
     return {
       success: true,
       coupons: [
-        { id: 1, code: 'DOCTOR50', description: '50% off biology modules', discount_type: 'percentage', discount_value: 50, minimum_amount: 199, usage_limit: 500, times_used: 142, active: 1, expiry_date: '2026-12-31' },
-        { id: 2, code: 'NEET2026', description: 'Flat ₹100 off on all bundles', discount_type: 'fixed', discount_value: 100, minimum_amount: 299, usage_limit: 500, times_used: 89, active: 1, expiry_date: '2026-12-31' },
+        { id: 1, code: 'DOCTOR50', description: '50% off biology modules', discount_type: 'percentage', discount_value: 50, minimum_amount: 0, usage_limit: 500, times_used: 142, active: 1, expiry_date: '2026-12-31' },
+        { id: 2, code: 'NEET2026', description: 'Flat ₹100 off on all bundles', discount_type: 'fixed', discount_value: 100, minimum_amount: 0, usage_limit: 500, times_used: 89, active: 1, expiry_date: '2026-12-31' },
       ],
     };
   },
