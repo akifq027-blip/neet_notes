@@ -146,6 +146,9 @@ export async function createAdminNote(req: Request, res: Response) {
       title,
       description,
       subject,
+      class_level,
+      exam,
+      resource_type,
       chapter,
       category_id,
       price,
@@ -158,23 +161,30 @@ export async function createAdminNote(req: Request, res: Response) {
       preview_pages,
       status,
       thumbnail_url,
+      pdf_url,
+      sample_pdf_url,
     } = req.body;
 
     if (!title || !subject || !chapter || !description) {
       return res.status(400).json({ success: false, message: 'Title, Subject, Chapter, and Description are required.' });
     }
 
-    // Normalize subject to match enum ('Physics', 'Chemistry', 'Biology', 'General NEET')
-    let safeSubject = 'General NEET';
+    // Normalize subject to match enum ('Physics', 'Chemistry', 'Biology', 'General NEET', 'Science', 'Mathematics')
+    let safeSubject = subject || 'General NEET';
     const subLower = String(subject || '').toLowerCase();
     if (subLower.includes('bio') || subLower.includes('botan') || subLower.includes('zool')) safeSubject = 'Biology';
     else if (subLower.includes('chem') || subLower.includes('organ') || subLower.includes('inorgan')) safeSubject = 'Chemistry';
     else if (subLower.includes('phys')) safeSubject = 'Physics';
-    else if (['Physics', 'Chemistry', 'Biology', 'General NEET'].includes(subject)) safeSubject = subject;
+    else if (subLower.includes('math')) safeSubject = 'Mathematics';
+    else if (subLower.includes('sci')) safeSubject = 'Science';
+
+    const safeClassLevel = class_level || 'NEET';
+    const safeExam = exam || 'NEET';
+    const safeResourceType = resource_type || 'Notes';
 
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
-    const pdfFilename = files?.['pdf_file']?.[0]?.filename || 'sample-handbook.pdf';
-    const previewFilename = files?.['preview_file']?.[0]?.filename || null;
+    const pdfFilename = files?.['pdf_file']?.[0]?.filename || pdf_url || 'sample-handbook.pdf';
+    const previewFilename = files?.['preview_file']?.[0]?.filename || sample_pdf_url || null;
     const thumbFilename = files?.['thumbnail']?.[0]?.filename
       ? `/backend/uploads/thumbnails/${files['thumbnail'][0].filename}`
       : (thumbnail_url || 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=80');
@@ -212,16 +222,19 @@ export async function createAdminNote(req: Request, res: Response) {
 
         const [result]: any = await pool.query(
           `INSERT INTO notes (
-            title, slug, description, subject, chapter, category_id,
+            title, slug, description, subject, class_level, exam, resource_type, chapter, category_id,
             price, original_price, thumbnail, pdf_file, preview_file,
             preview_pages, total_pages, is_free, is_featured, is_bestseller,
             author_name, status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             title.trim(),
             slug,
             description.trim(),
             safeSubject,
+            safeClassLevel,
+            safeExam,
+            safeResourceType,
             chapter.trim(),
             safeCategoryId,
             priceNum,
@@ -251,6 +264,9 @@ export async function createAdminNote(req: Request, res: Response) {
           slug,
           description: description.trim(),
           subject: safeSubject,
+          class_level: safeClassLevel,
+          exam: safeExam,
+          resource_type: safeResourceType,
           chapter: chapter.trim(),
           category_id: safeCategoryId,
           price: priceNum,
@@ -292,6 +308,9 @@ export async function createAdminNote(req: Request, res: Response) {
       slug,
       description: description.trim(),
       subject: safeSubject,
+      class_level: safeClassLevel,
+      exam: safeExam,
+      resource_type: safeResourceType,
       chapter: chapter.trim(),
       category_id: safeCategoryId || 1,
       price: priceNum,
@@ -334,6 +353,9 @@ export async function updateAdminNote(req: Request, res: Response) {
       title,
       description,
       subject,
+      class_level,
+      exam,
+      resource_type,
       chapter,
       category_id,
       price,
@@ -346,6 +368,8 @@ export async function updateAdminNote(req: Request, res: Response) {
       preview_pages,
       status,
       thumbnail_url,
+      pdf_url,
+      sample_pdf_url,
     } = req.body;
 
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
@@ -364,10 +388,14 @@ export async function updateAdminNote(req: Request, res: Response) {
           if (subLower.includes('bio')) safeSubject = 'Biology';
           else if (subLower.includes('chem')) safeSubject = 'Chemistry';
           else if (subLower.includes('phys')) safeSubject = 'Physics';
-          else if (['Physics', 'Chemistry', 'Biology', 'General NEET'].includes(subject)) safeSubject = subject;
+          else if (subLower.includes('math')) safeSubject = 'Mathematics';
+          else if (subLower.includes('sci')) safeSubject = 'Science';
           updateFields.push('subject = ?');
           params.push(safeSubject);
         }
+        if (class_level) { updateFields.push('class_level = ?'); params.push(class_level); }
+        if (exam) { updateFields.push('exam = ?'); params.push(exam); }
+        if (resource_type) { updateFields.push('resource_type = ?'); params.push(resource_type); }
         if (chapter) { updateFields.push('chapter = ?'); params.push(chapter.trim()); }
         if (category_id !== undefined) {
           const parsedCat = parseInt(category_id, 10);
@@ -392,11 +420,19 @@ export async function updateAdminNote(req: Request, res: Response) {
         if (files?.['pdf_file']?.[0]) {
           updateFields.push('pdf_file = ?');
           params.push(files['pdf_file'][0].filename);
+        } else if (pdf_url) {
+          updateFields.push('pdf_file = ?');
+          params.push(pdf_url);
         }
+
         if (files?.['preview_file']?.[0]) {
           updateFields.push('preview_file = ?');
           params.push(files['preview_file'][0].filename);
+        } else if (sample_pdf_url) {
+          updateFields.push('preview_file = ?');
+          params.push(sample_pdf_url);
         }
+
         if (files?.['thumbnail']?.[0]) {
           updateFields.push('thumbnail = ?');
           params.push(`/backend/uploads/thumbnails/${files['thumbnail'][0].filename}`);
@@ -432,6 +468,9 @@ export async function updateAdminNote(req: Request, res: Response) {
     if (title) note.title = title.trim();
     if (description) note.description = description.trim();
     if (subject) note.subject = subject;
+    if (class_level) note.class_level = class_level;
+    if (exam) note.exam = exam;
+    if (resource_type) note.resource_type = resource_type;
     if (chapter) note.chapter = chapter.trim();
     if (category_id !== undefined) note.category_id = parseInt(category_id, 10) || 1;
     if (price !== undefined) note.price = parseFloat(price);
@@ -444,6 +483,8 @@ export async function updateAdminNote(req: Request, res: Response) {
     if (preview_pages) note.preview_pages = parseInt(preview_pages, 10);
     if (status) note.status = status;
     if (thumbnail_url) note.thumbnail = thumbnail_url;
+    if (pdf_url) note.pdf_file = pdf_url;
+    if (sample_pdf_url) note.preview_file = sample_pdf_url;
 
     if (files?.['pdf_file']?.[0]) note.pdf_file = files['pdf_file'][0].filename;
     if (files?.['preview_file']?.[0]) note.preview_file = files['preview_file'][0].filename;

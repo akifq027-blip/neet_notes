@@ -47,6 +47,9 @@ export interface Note {
   status: 'published' | 'draft' | 'archived';
   created_at: string;
   updated_at?: string;
+  order_number?: string;
+  purchased_at?: string;
+  is_archived?: boolean;
 }
 
 export interface Category {

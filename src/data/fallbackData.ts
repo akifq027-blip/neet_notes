@@ -624,14 +624,87 @@ export let FALLBACK_NOTES: Note[] = [
   },
 ];
 
+const STORAGE_KEY = 'neet_notes_catalog';
+
+function initStoredNotes(): Note[] {
+  if (typeof window === 'undefined') return FALLBACK_NOTES;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+    // Seed initial catalog into localStorage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(FALLBACK_NOTES));
+  } catch (e) {
+    console.error('Failed to access localStorage for notes catalog:', e);
+  }
+  return FALLBACK_NOTES;
+}
+
 export function getFallbackNotes(): Note[] {
+  if (typeof window === 'undefined') return FALLBACK_NOTES;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        FALLBACK_NOTES = parsed;
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
   return FALLBACK_NOTES;
 }
 
 export function removeFallbackNote(id: number): void {
   FALLBACK_NOTES = FALLBACK_NOTES.filter(n => n.id !== id);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(FALLBACK_NOTES));
+      window.dispatchEvent(new CustomEvent('neet_notes_updated', { detail: { action: 'delete', id } }));
+    } catch (e) {
+      console.error(e);
+    }
+  }
 }
 
 export function addFallbackNote(note: Note): void {
-  FALLBACK_NOTES.unshift(note);
+  // Check if exists
+  const existingIdx = FALLBACK_NOTES.findIndex(n => n.id === note.id);
+  if (existingIdx >= 0) {
+    FALLBACK_NOTES[existingIdx] = { ...FALLBACK_NOTES[existingIdx], ...note };
+  } else {
+    FALLBACK_NOTES.unshift(note);
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(FALLBACK_NOTES));
+      window.dispatchEvent(new CustomEvent('neet_notes_updated', { detail: { action: 'add', note } }));
+    } catch (e) {
+      console.error(e);
+    }
+  }
 }
+
+export function updateFallbackNote(id: number, updated: Partial<Note>): Note | null {
+  const idx = FALLBACK_NOTES.findIndex(n => n.id === id);
+  if (idx >= 0) {
+    FALLBACK_NOTES[idx] = { ...FALLBACK_NOTES[idx], ...updated };
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(FALLBACK_NOTES));
+        window.dispatchEvent(new CustomEvent('neet_notes_updated', { detail: { action: 'update', id, updated } }));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return FALLBACK_NOTES[idx];
+  }
+  return null;
+}
+

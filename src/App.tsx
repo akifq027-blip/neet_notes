@@ -115,6 +115,18 @@ export function App() {
 
     // Load Notes
     fetchNotesList();
+
+    const handleCatalogUpdate = () => {
+      fetchNotesList();
+    };
+
+    window.addEventListener('neet_notes_updated', handleCatalogUpdate);
+    window.addEventListener('storage', handleCatalogUpdate);
+
+    return () => {
+      window.removeEventListener('neet_notes_updated', handleCatalogUpdate);
+      window.removeEventListener('storage', handleCatalogUpdate);
+    };
   }, []);
 
   // Re-fetch notes on filter change
