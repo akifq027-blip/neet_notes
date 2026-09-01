@@ -37,10 +37,11 @@ router.post('/wishlist/toggle', requireAuth, notesCtrl.toggleWishlist);
 router.get('/library', requireAuth, notesCtrl.getStudentLibrary);
 
 // ==========================================
-// CHECKOUT & PAYMENT ROUTES (RAZORPAY)
+// CHECKOUT & PAYMENT ROUTES (RAZORPAY & UPI)
 // ==========================================
 router.post('/payment/create-order', requireAuth, payCtrl.createCheckoutOrder);
 router.post('/payment/verify', requireAuth, payCtrl.verifyPayment);
+router.post('/payment/verify-upi', requireAuth, payCtrl.verifyUpiPayment);
 router.get('/orders', requireAuth, payCtrl.getUserOrders);
 
 // ==========================================

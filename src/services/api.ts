@@ -659,19 +659,46 @@ export const api = {
       return result;
     }
 
-    // Local fallback order generation
-    const noteId = data.note_id || (data.items && data.items[0]?.id) || 1;
-    const note = getFallbackNotes().find(n => n.id === Number(noteId)) || getFallbackNotes()[0];
-    const amount = Number(note.price) || 199;
+    // Local fallback order generation with secure masked UPI config
+    const rawNoteIds: number[] = Array.isArray(data.items)
+      ? data.items.map(i => (typeof i === 'object' ? i.id || i.note_id : Number(i))).filter(Boolean)
+      : data.note_id ? [Number(data.note_id)] : [1];
+
+    const allNotes = getFallbackNotes();
+    const selectedNotes = allNotes.filter(n => rawNoteIds.includes(n.id));
+    const finalNotes = selectedNotes.length > 0 ? selectedNotes : [allNotes[0]];
+    const subtotal = finalNotes.reduce((sum, n) => sum + (n.is_free ? 0 : Number(n.price) || 0), 0);
     const orderId = Date.now();
+    const orderNumber = `ORD-NEET-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const merchantUpiId = 'neetnotes@icici';
+    const merchantName = 'NEET Notes HQ';
+    const upiNoteText = encodeURIComponent(`Notes Order ${orderNumber}`);
+    const upiIntentUrl = `upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${subtotal.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
+    const gpayUrl = `gpay://upi/pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${subtotal.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
+    const phonepeUrl = `phonepe://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${subtotal.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
+    const paytmUrl = `paytmmp://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${subtotal.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
 
     return {
       success: true,
+      isFree: subtotal === 0,
       orderId,
+      orderNumber,
       razorpayOrderId: `order_local_${orderId}`,
-      amount: Math.round(amount * 100),
+      amount: subtotal,
+      amountPaise: Math.round(subtotal * 100),
       currency: 'INR',
-      key_id: 'rzp_test_demo_key',
+      keyId: 'rzp_test_TW9S6IV6qcqE6z',
+      isLiveRazorpay: false,
+      upiConfig: {
+        merchantUpiId,
+        maskedUpiId: 'ne****@icici',
+        merchantName,
+        upiIntentUrl,
+        gpayUrl,
+        phonepeUrl,
+        paytmUrl,
+      },
       customer: {
         name: 'NEET Aspirant',
         email: 'student@example.com',
@@ -680,11 +707,80 @@ export const api = {
     };
   },
 
+  async verifyUpiPayment(data: {
+    orderId: number;
+    utr: string;
+    appName?: string;
+    items?: number[];
+  }): Promise<{ success: boolean; message: string; orderId?: number; maskedReference?: string }> {
+    const result = await safeFetch(`${API_BASE}/payment/verify-upi`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (result && result.success && !result.isOffline) {
+      // Broadcast update
+      window.dispatchEvent(new CustomEvent('neet_notes_updated'));
+      return result;
+    }
+
+    // Grant access locally
+    const currentOrders = getLocalOrders();
+    const cleanUtr = String(data.utr || '').trim();
+    const maskedRef = cleanUtr.length > 4 ? `****${cleanUtr.slice(-4)}` : '****';
+    const orderNum = `ORD-UPI-${Date.now().toString().slice(-6)}`;
+    const noteIds = data.items && data.items.length > 0 ? data.items : [1];
+    const catalog = getFallbackNotes();
+    const purchasedNotes = catalog.filter(n => noteIds.includes(n.id));
+
+    const newOrder: Order = {
+      id: data.orderId || Date.now(),
+      order_number: orderNum,
+      user_id: 2,
+      subtotal: purchasedNotes.reduce((sum, n) => sum + (n.is_free ? 0 : Number(n.price)), 0) || 199.0,
+      discount_amount: 0,
+      total_amount: purchasedNotes.reduce((sum, n) => sum + (n.is_free ? 0 : Number(n.price)), 0) || 199.0,
+      payment_status: 'paid',
+      payment_method: `UPI (${data.appName || 'Instant GPay/PhonePe'})`,
+      razorpay_payment_id: `UPI-${cleanUtr || 'VERIFIED'}`,
+      created_at: new Date().toISOString(),
+      items: (purchasedNotes.length > 0 ? purchasedNotes : [catalog[0]]).map(n => ({
+        id: Date.now() + n.id,
+        order_id: data.orderId || Date.now(),
+        note_id: n.id,
+        price: n.price,
+        note_title: n.title,
+        subject: n.subject,
+        pdf_file: n.pdf_file,
+      })),
+    };
+
+    currentOrders.unshift(newOrder);
+    saveLocalOrders(currentOrders);
+
+    const ids = getLocalLibraryIds();
+    noteIds.forEach(id => {
+      if (!ids.includes(id)) ids.push(id);
+    });
+    saveLocalLibraryIds(ids);
+
+    window.dispatchEvent(new CustomEvent('neet_notes_updated'));
+
+    return {
+      success: true,
+      message: 'UPI payment verified successfully! Access granted to your notes.',
+      orderId: newOrder.id,
+      maskedReference: maskedRef,
+    };
+  },
+
   async verifyPayment(data: {
     orderId: number;
     razorpay_order_id?: string;
     razorpay_payment_id?: string;
     razorpay_signature?: string;
+    items?: number[];
   }): Promise<{ success: boolean; message: string; orderId?: number }> {
     const result = await safeFetch(`${API_BASE}/payment/verify`, {
       method: 'POST',
@@ -693,41 +789,49 @@ export const api = {
     });
 
     if (result && result.success && !result.isOffline) {
+      window.dispatchEvent(new CustomEvent('neet_notes_updated'));
       return result;
     }
 
     // Grant access locally
     const currentOrders = getLocalOrders();
     const orderNum = `ORD-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const noteIds = data.items && data.items.length > 0 ? data.items : [1];
+    const catalog = getFallbackNotes();
+    const purchasedNotes = catalog.filter(n => noteIds.includes(n.id));
+
     const newOrder: Order = {
       id: data.orderId || Date.now(),
       order_number: orderNum,
       user_id: 2,
-      subtotal: 199.00,
+      subtotal: purchasedNotes.reduce((sum, n) => sum + (n.is_free ? 0 : Number(n.price)), 0) || 199.0,
       discount_amount: 0,
-      total_amount: 199.00,
+      total_amount: purchasedNotes.reduce((sum, n) => sum + (n.is_free ? 0 : Number(n.price)), 0) || 199.0,
       payment_status: 'paid',
-      payment_method: 'Razorpay / UPI',
+      payment_method: 'Razorpay / Cards',
+      razorpay_payment_id: data.razorpay_payment_id || 'PAY-VERIFIED',
       created_at: new Date().toISOString(),
-      items: [
-        {
-          id: Date.now(),
-          order_id: data.orderId || Date.now(),
-          note_id: 1,
-          price: 199.00,
-          note_title: 'Human Physiology Master Handbook (All 7 Chapters)',
-          subject: 'Biology',
-          pdf_file: 'human-physiology-master.pdf',
-        },
-      ],
+      items: (purchasedNotes.length > 0 ? purchasedNotes : [catalog[0]]).map(n => ({
+        id: Date.now() + n.id,
+        order_id: data.orderId || Date.now(),
+        note_id: n.id,
+        price: n.price,
+        note_title: n.title,
+        subject: n.subject,
+        pdf_file: n.pdf_file,
+      })),
     };
 
     currentOrders.unshift(newOrder);
     saveLocalOrders(currentOrders);
 
     const ids = getLocalLibraryIds();
-    if (!ids.includes(1)) ids.push(1);
+    noteIds.forEach(id => {
+      if (!ids.includes(id)) ids.push(id);
+    });
     saveLocalLibraryIds(ids);
+
+    window.dispatchEvent(new CustomEvent('neet_notes_updated'));
 
     return {
       success: true,

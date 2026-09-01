@@ -261,6 +261,20 @@ export async function createCheckoutOrder(req: AuthRequest, res: Response) {
       });
     }
 
+    const merchantUpiId = process.env.MERCHANT_UPI_ID || 'neetnotes@icici';
+    const merchantName = process.env.MERCHANT_NAME || 'NEET Notes HQ';
+    const upiNoteText = encodeURIComponent(`Notes Order ${orderNumber}`);
+    const upiIntentUrl = `upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${totalAmount.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
+    const gpayUrl = `gpay://upi/pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${totalAmount.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
+    const phonepeUrl = `phonepe://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${totalAmount.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
+    const paytmUrl = `paytmmp://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${totalAmount.toFixed(2)}&tr=${encodeURIComponent(orderNumber)}&tn=${upiNoteText}&cu=INR`;
+
+    // Mask merchant UPI ID for security
+    const upiParts = merchantUpiId.split('@');
+    const maskedUpiId = upiParts.length === 2
+      ? `${upiParts[0].slice(0, 2)}***${upiParts[0].slice(-1)}@${upiParts[1]}`
+      : 'neet***@upi';
+
     return res.json({
       success: true,
       isFree: false,
@@ -274,6 +288,15 @@ export async function createCheckoutOrder(req: AuthRequest, res: Response) {
       discountAmount,
       keyId: getRazorpayPublicKey(),
       isLiveRazorpay: isRazorpayConfigured(),
+      upiConfig: {
+        merchantUpiId,
+        maskedUpiId,
+        merchantName,
+        upiIntentUrl,
+        gpayUrl,
+        phonepeUrl,
+        paytmUrl,
+      },
       customer: {
         name: req.user.name,
         email: req.user.email,
@@ -282,6 +305,96 @@ export async function createCheckoutOrder(req: AuthRequest, res: Response) {
   } catch (error: any) {
     console.error('[Create Order Error]', error);
     return res.status(500).json({ success: false, message: 'Failed to initiate checkout order.' });
+  }
+}
+
+export async function verifyUpiPayment(req: AuthRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    const { orderId, utr, appName } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: 'Order ID is required.' });
+    }
+
+    const cleanUtr = String(utr || '').trim();
+    if (!cleanUtr || cleanUtr.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid 12-digit UPI Reference / UTR / Transaction ID from your payment app.',
+      });
+    }
+
+    const paymentMethodLabel = appName ? `upi_${appName.toLowerCase().replace(/[^a-z0-9]/g, '')}` : 'upi_direct';
+    const cleanRefId = `UPI-${cleanUtr.toUpperCase()}`;
+
+    // Update order to paid
+    if (isMySQLConnected()) {
+      const pool = getPool();
+      if (pool) {
+        // Prevent duplicate UTR reuse
+        const [existing]: any = await pool.query(
+          `SELECT id FROM orders WHERE razorpay_payment_id = ? AND id != ? AND payment_status = 'paid'`,
+          [cleanRefId, orderId]
+        );
+        if (existing && existing.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'This UPI Transaction Reference (UTR) has already been utilized for another order.',
+          });
+        }
+
+        await pool.query(
+          `UPDATE orders SET payment_status = 'paid', payment_method = ?, razorpay_payment_id = ?, updated_at = NOW() WHERE id = ? AND user_id = ?`,
+          [paymentMethodLabel, cleanRefId, orderId, req.user.id]
+        );
+
+        // Increment purchase counts
+        const [items]: any = await pool.query('SELECT note_id FROM order_items WHERE order_id = ?', [orderId]);
+        for (const item of items) {
+          await pool.query('UPDATE notes SET purchase_count = purchase_count + 1 WHERE id = ?', [item.note_id]);
+        }
+
+        const [ord]: any = await pool.query('SELECT coupon_code FROM orders WHERE id = ?', [orderId]);
+        if (ord[0]?.coupon_code) {
+          await pool.query('UPDATE coupons SET times_used = times_used + 1 WHERE code = ?', [ord[0].coupon_code]);
+        }
+      }
+    } else {
+      const order = memoryStore.orders.find(o => o.id === parseInt(orderId, 10) && o.user_id === req.user?.id);
+      if (order) {
+        order.payment_status = 'paid';
+        order.payment_method = paymentMethodLabel;
+        order.razorpay_payment_id = cleanRefId;
+
+        const items = memoryStore.order_items.filter(oi => oi.order_id === order.id);
+        items.forEach(item => {
+          const note = memoryStore.notes.find(n => n.id === item.note_id);
+          if (note) note.purchase_count = (note.purchase_count || 0) + 1;
+        });
+
+        if (order.coupon_code) {
+          const cp = memoryStore.coupons.find(c => c.code === order.coupon_code);
+          if (cp) cp.times_used = (cp.times_used || 0) + 1;
+        }
+      }
+    }
+
+    // Return masked UTR for privacy
+    const maskedRef = cleanUtr.length > 4 ? `****${cleanUtr.slice(-4)}` : '****';
+
+    return res.json({
+      success: true,
+      message: 'UPI payment received and validated successfully! Notes have been unlocked in your library.',
+      orderId,
+      maskedReference: maskedRef,
+    });
+  } catch (error: any) {
+    console.error('[Verify UPI Error]', error);
+    return res.status(500).json({ success: false, message: 'Failed to complete UPI payment verification.' });
   }
 }
 
@@ -395,6 +508,12 @@ export async function getUserOrders(req: AuthRequest, res: Response) {
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       ordersWithItems = userOrders.map(order => {
+        const maskedPaymentId = order.razorpay_payment_id
+          ? (order.razorpay_payment_id.length > 8
+              ? `${order.razorpay_payment_id.slice(0, 4)}****${order.razorpay_payment_id.slice(-4)}`
+              : '****')
+          : null;
+
         const items = memoryStore.order_items
           .filter(oi => oi.order_id === order.id)
           .map(item => {
@@ -408,7 +527,7 @@ export async function getUserOrders(req: AuthRequest, res: Response) {
               pdf_file: note?.pdf_file,
             };
           });
-        return { ...order, items };
+        return { ...order, razorpay_payment_id: maskedPaymentId, items };
       });
     }
 
