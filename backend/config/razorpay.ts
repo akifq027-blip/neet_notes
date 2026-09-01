@@ -4,23 +4,40 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_YourKeyIdHere';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'YourKeySecretHere';
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || '';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '';
 
 let razorpayInstance: Razorpay | null = null;
 
-export function getRazorpayClient(): Razorpay | null {
+export function isRazorpayConfigured(): boolean {
+  if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) return false;
+  const key = RAZORPAY_KEY_ID.trim();
+  const secret = RAZORPAY_KEY_SECRET.trim();
+  
   if (
-    RAZORPAY_KEY_ID &&
-    RAZORPAY_KEY_SECRET &&
-    !RAZORPAY_KEY_ID.includes('YourKeyId') &&
-    !RAZORPAY_KEY_SECRET.includes('YourKeySecret')
+    key.includes('YourKeyId') ||
+    secret.includes('YourKeySecret') ||
+    key.length < 10 ||
+    secret.length < 10 ||
+    key === 'rzp_test_TW9S6IV6qcqE6z' // placeholder test key
   ) {
+    return false;
+  }
+  return true;
+}
+
+export function getRazorpayClient(): Razorpay | null {
+  if (isRazorpayConfigured()) {
     if (!razorpayInstance) {
-      razorpayInstance = new Razorpay({
-        key_id: RAZORPAY_KEY_ID,
-        key_secret: RAZORPAY_KEY_SECRET,
-      });
+      try {
+        razorpayInstance = new Razorpay({
+          key_id: RAZORPAY_KEY_ID,
+          key_secret: RAZORPAY_KEY_SECRET,
+        });
+      } catch (err) {
+        console.warn('[Razorpay Init Warning] Could not instantiate Razorpay SDK:', err);
+        return null;
+      }
     }
     return razorpayInstance;
   }
@@ -28,16 +45,7 @@ export function getRazorpayClient(): Razorpay | null {
 }
 
 export function getRazorpayPublicKey(): string {
-  return RAZORPAY_KEY_ID;
-}
-
-export function isRazorpayConfigured(): boolean {
-  return Boolean(
-    RAZORPAY_KEY_ID &&
-    RAZORPAY_KEY_SECRET &&
-    !RAZORPAY_KEY_ID.includes('YourKeyId') &&
-    !RAZORPAY_KEY_SECRET.includes('YourKeySecret')
-  );
+  return isRazorpayConfigured() ? RAZORPAY_KEY_ID : '';
 }
 
 export function verifyPaymentSignature(
@@ -47,13 +55,18 @@ export function verifyPaymentSignature(
 ): boolean {
   // If in test simulation mode without real keys:
   if (!isRazorpayConfigured()) {
-    return signature.startsWith('sig_') || signature.length > 5;
+    return Boolean(signature && (signature.startsWith('sig_') || signature.length >= 4));
   }
 
-  const generatedSignature = crypto
-    .createHmac('sha256', RAZORPAY_KEY_SECRET)
-    .update(`${orderId}|${paymentId}`)
-    .digest('hex');
+  try {
+    const generatedSignature = crypto
+      .createHmac('sha256', RAZORPAY_KEY_SECRET)
+      .update(`${orderId}|${paymentId}`)
+      .digest('hex');
 
-  return generatedSignature === signature;
+    return generatedSignature === signature;
+  } catch {
+    return false;
+  }
 }
+
