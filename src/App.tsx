@@ -22,6 +22,7 @@ import { Footer } from './components/Footer';
 import { HeroSection } from './components/HeroSection';
 import { NoteCard } from './components/NoteCard';
 import { PreviewReaderModal } from './components/PreviewReaderModal';
+import { SecureNotesReader } from './components/SecureNotesReader';
 import { NoteDetailModal } from './components/NoteDetailModal';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
@@ -80,6 +81,7 @@ export function App() {
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'admin'>('login');
   const [reopenCheckoutAfterAuth, setReopenCheckoutAfterAuth] = useState(false);
   const [previewNote, setPreviewNote] = useState<Note | null>(null);
+  const [secureReaderNote, setSecureReaderNote] = useState<Note | null>(null);
   const [detailNoteId, setDetailNoteId] = useState<number | null>(null);
 
   // Sync Cart to LocalStorage
@@ -675,6 +677,7 @@ export function App() {
             initialTab={dashboardInitialTab}
             onNavigate={handleNavigate}
             onPreviewNote={(n) => setPreviewNote(n)}
+            onOpenReader={(n) => setSecureReaderNote(n)}
             onAddToCart={handleAddToCart}
             onUpdateUser={(updated) => setCurrentUser(updated)}
           />
@@ -732,12 +735,21 @@ export function App() {
         }}
       />
 
+      {/* 1b. Secure In-App Notes Reader (Full Material, Anti-Piracy Watermark & Screenshot Shield) */}
+      <SecureNotesReader
+        note={secureReaderNote}
+        isOpen={Boolean(secureReaderNote)}
+        onClose={() => setSecureReaderNote(null)}
+        currentUser={currentUser}
+      />
+
       {/* 2. Detailed Note Modal */}
       <NoteDetailModal
         noteId={detailNoteId}
         isOpen={Boolean(detailNoteId)}
         onClose={() => setDetailNoteId(null)}
         onPreview={(n) => setPreviewNote(n)}
+        onOpenReader={(n) => setSecureReaderNote(n)}
         onAddToCart={(n) => handleAddToCart(n)}
         onBuyNow={(n) => handleBuyNow(n)}
         onToggleWishlist={handleToggleWishlist}

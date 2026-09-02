@@ -175,5 +175,41 @@ export interface SiteSettings {
   maintenance_mode?: string;
   announcement_bar?: string;
   currency_symbol?: string;
+  allow_pdf_downloads?: string; // '0' = Online Reading Only (Anti-Piracy Protected), '1' = Allow Direct PDF Downloads
   [key: string]: any;
 }
+
+export interface SecureReaderPage {
+  pageNumber: number;
+  imageUrl?: string;
+  sectionTitle: string;
+  badge?: string;
+  paragraphs: string[];
+  bulletPoints?: string[];
+  infobox?: { title: string; text: string };
+  diagramNote?: string;
+}
+
+export interface SecureReaderData {
+  note: {
+    id: number;
+    title: string;
+    subject: string;
+    chapter: string;
+    class_level?: string;
+    author_name?: string;
+    total_pages?: number;
+    order_number?: string;
+  };
+  license: {
+    userName: string;
+    userEmail: string;
+    userPhone?: string;
+    userId: number;
+    orderNumber: string;
+    watermarkText: string;
+    unlockedAt: string;
+  };
+  pages: SecureReaderPage[];
+}
+

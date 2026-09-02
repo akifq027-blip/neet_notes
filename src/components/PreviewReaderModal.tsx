@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { X, ChevronLeft, ChevronRight, Lock, CheckCircle2, Download, ShoppingCart, Sparkles, BookOpen } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, ChevronLeft, ChevronRight, Lock, CheckCircle2, Download, ShoppingCart, Sparkles, BookOpen, FileText } from 'lucide-react';
 import { Note } from '../types';
+import { api } from '../services/api';
 
 interface PreviewReaderModalProps {
   note: Note | null;
@@ -20,10 +21,25 @@ export const PreviewReaderModal: React.FC<PreviewReaderModalProps> = ({
   isPurchased = false,
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
+  const [previewSamples, setPreviewSamples] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<'pdf' | 'text'>('pdf');
+
+  useEffect(() => {
+    if (!isOpen || !note) return;
+    setCurrentPage(1);
+    api.getPreview(note.id).then((res) => {
+      if (res && res.success && res.previewSamples && res.previewSamples.length > 0) {
+        setPreviewSamples(res.previewSamples);
+      } else {
+        setPreviewSamples([]);
+      }
+    });
+  }, [isOpen, note]);
 
   if (!isOpen || !note) return null;
 
   const totalPreviewPages = note.preview_pages || 4;
+  const activeSample = previewSamples.find((s) => s.pageNumber === currentPage);
 
   const getPageContent = (page: number) => {
     switch (page) {
@@ -123,38 +139,71 @@ export const PreviewReaderModal: React.FC<PreviewReaderModalProps> = ({
             <div className="border-b-2 border-emerald-600 pb-4 mb-6">
               <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-1">
                 <span>Subject: {note.subject}</span>
-                <span className="text-emerald-700 font-bold">{pageData.badge}</span>
+                <div className="flex items-center gap-2">
+                  {activeSample?.imageUrl && (
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                      Scanned PDF Page
+                    </span>
+                  )}
+                  <span className="text-emerald-700 font-bold">{pageData.badge}</span>
+                </div>
               </div>
               <h3 className="text-lg sm:text-xl font-bold text-slate-900">
-                {pageData.title}
+                {activeSample?.title || pageData.title}
               </h3>
             </div>
 
-            {/* Content Points */}
-            <div className="space-y-4 my-auto">
-              <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-4">
-                <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                  Key Takeaways & High-Yield Extract
-                </h4>
-                <ul className="space-y-2 text-xs sm:text-sm text-slate-700 leading-relaxed">
-                  {pageData.points.map((pt, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                      <span>{pt}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            {/* If Real Rendered Scanned Page is available */}
+            {activeSample?.imageUrl ? (
+              <div className="space-y-4 my-auto">
+                <div className="relative rounded-xl overflow-hidden border border-slate-200 shadow-md bg-white">
+                  <img
+                    src={activeSample.imageUrl}
+                    alt={`Preview Page ${currentPage}`}
+                    className="w-full h-auto object-contain block select-none pointer-events-none"
+                    draggable={false}
+                    onContextMenu={(e) => e.preventDefault()}
+                  />
+                  {/* Subtle watermark */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 rotate-[-25deg]">
+                    <span className="text-2xl sm:text-4xl font-black text-slate-900 tracking-widest uppercase">
+                      SAMPLE PREVIEW ONLY
+                    </span>
+                  </div>
+                </div>
 
-              {/* Diagram / Schematic Box */}
-              <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 text-center">
-                <p className="text-xs font-semibold text-slate-600">{pageData.diagramSnippet}</p>
-                <div className="mt-2 text-[11px] text-slate-400">
-                  Full 4K vector illustrations included in complete {note.total_pages}-page study packet.
+                <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3.5 text-xs text-slate-700 leading-relaxed">
+                  <p className="font-semibold text-emerald-900 mb-1">NCERT Page Extract:</p>
+                  <p>{activeSample.contentSnippet}</p>
                 </div>
               </div>
-            </div>
+            ) : (
+              /* Standard Sample Preview Points */
+              <div className="space-y-4 my-auto">
+                <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-4">
+                  <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    Key Takeaways & High-Yield Extract
+                  </h4>
+                  <ul className="space-y-2 text-xs sm:text-sm text-slate-700 leading-relaxed">
+                    {pageData.points.map((pt, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>{pt}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Diagram / Schematic Box */}
+                <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50 text-center">
+                  <p className="text-xs font-semibold text-slate-600">{pageData.diagramSnippet}</p>
+                  <div className="mt-2 text-[11px] text-slate-400">
+                    Full 4K vector illustrations included in complete {note.total_pages}-page study packet.
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Note Footer */}
             <div className="border-t border-slate-100 pt-4 mt-6 flex items-center justify-between text-[11px] text-slate-400">

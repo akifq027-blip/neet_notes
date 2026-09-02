@@ -1667,6 +1667,70 @@ export const AdminDashboard: React.FC = () => {
               />
             </div>
 
+            {/* Content Delivery & Anti-Piracy Protection Mode Toggle */}
+            <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                <label className="font-black text-slate-900 text-xs uppercase tracking-wide">
+                  Content Delivery & Anti-Piracy Protection Mode
+                </label>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Choose how students access their purchased notes. With &quot;Online Reading Only&quot;, direct PDF downloads are locked. Students view notes exclusively inside the secure, full-screen in-app reader protected with student-specific dynamic watermarks and screenshot interception.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <label
+                  className={`p-3.5 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
+                    (settings.allow_pdf_downloads ?? '0') === '0'
+                      ? 'bg-white border-emerald-600 shadow-xs'
+                      : 'bg-white/60 border-slate-200 opacity-75 hover:opacity-100'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="allow_pdf_downloads"
+                    value="0"
+                    checked={(settings.allow_pdf_downloads ?? '0') === '0'}
+                    onChange={() => setSettings({ ...settings, allow_pdf_downloads: '0' })}
+                    className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div>
+                    <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <span>Online Reading Only</span>
+                      <span className="bg-emerald-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded">RECOMMENDED</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                      Disables direct PDF downloads. Students read in the in-app reader with dynamic watermarking (Name, Email, Phone, Order ID).
+                    </p>
+                  </div>
+                </label>
+
+                <label
+                  className={`p-3.5 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
+                    settings.allow_pdf_downloads === '1'
+                      ? 'bg-white border-emerald-600 shadow-xs'
+                      : 'bg-white/60 border-slate-200 opacity-75 hover:opacity-100'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="allow_pdf_downloads"
+                    value="1"
+                    checked={settings.allow_pdf_downloads === '1'}
+                    onChange={() => setSettings({ ...settings, allow_pdf_downloads: '1' })}
+                    className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div>
+                    <div className="font-bold text-slate-900 text-xs">Allow PDF Downloads</div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                      Allows students to download the original raw PDF files alongside the In-App Reader.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <button
               type="submit"
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl flex items-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer"

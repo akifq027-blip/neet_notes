@@ -3,6 +3,189 @@ import path from 'path';
 import fs from 'fs';
 import { memoryStore, getPool, isMySQLConnected } from '../config/db';
 import { AuthRequest } from '../middleware/auth';
+import { getOrRenderPdfPages } from '../utils/pdfRenderer';
+
+export const CELL_UNIT_OF_LIFE_PAGES = [
+  {
+    pageNumber: 1,
+    sectionTitle: 'Chapter 8: Cell - The Unit of Life (Introduction, What is a Cell?, Cell Theory)',
+    badge: 'Introduction & History',
+    paragraphs: [
+      'What makes an organism living? The answer to this is the presence of the basic unit of life - the cell - in all living organisms. All organisms are composed of cells.',
+      'Anton Von Leeuwenhoek first saw and described a live cell.',
+      'In 1838, Matthias Schleiden, a German botanist, examined a large number of plants and observed that all plants are composed of different kinds of cells which form the tissues of the plant.',
+    ],
+    bulletPoints: [
+      'Cell is the fundamental structural and functional unit of all living organisms.',
+      'Anything less than a complete structure of a cell does not ensure independent living.',
+      'Anton Von Leeuwenhoek first saw and described a live cell.',
+      'Matthias Schleiden (1838) observed plant tissues are composed of cells.',
+    ],
+  },
+  {
+    pageNumber: 2,
+    sectionTitle: '4. An Overview of Cell (Cell Theory & Dimensions)',
+    badge: 'Cell Overview',
+    paragraphs: [
+      'Theodore Schwann (1839), British Zoologist, reported that animal cells had a thin outer plasma membrane and plant cells possess cell walls.',
+      'Rudolf Virchow (1855) modified cell theory: Omnis cellula-e cellula (All cells arise from pre-existing cells).',
+      'The cytoplasm is the main arena of cellular activities in both plant and animal cells.',
+    ],
+    bulletPoints: [
+      'Cell Theory: (i) All living organisms are composed of cells and products of cells; (ii) All cells arise from pre-existing cells.',
+      'Mycoplasma is the smallest cell (~0.3 µm); Ostrich egg is the largest isolated single cell; Nerve cells are among the longest.',
+      'Ribosomes are non-membrane bound organelles found in cytoplasm, chloroplast, mitochondria, and rough ER.',
+      'Animal cells contain centrosome which helps in cell division.',
+    ],
+  },
+  {
+    pageNumber: 3,
+    sectionTitle: '5. Prokaryotic Cells & Cell Envelope Modifications',
+    badge: 'Prokaryotic Structure',
+    paragraphs: [
+      'Prokaryotic cells lack membrane bound nuclei and organelles. Represented by bacteria, blue-green algae, Mycoplasma, or PPLO.',
+      'In addition to genomic DNA, bacteria have small circular DNA called plasmids conferring unique characters like antibiotic resistance.',
+      'Most prokaryotes have a tightly bound three-layered cell envelope: outermost glycocalyx, middle cell wall, inner plasma membrane.',
+    ],
+    bulletPoints: [
+      'All prokaryotes have cell wall surrounding cell membrane (except Mycoplasma).',
+      'Glycocalyx: loose sheath (slime layer) or thick and tough (capsule).',
+      'The cell wall prevents bacteria from bursting or collapsing.',
+      'Plasmids are used to monitor bacterial transformation with foreign DNA.',
+    ],
+  },
+  {
+    pageNumber: 4,
+    sectionTitle: 'Ribosomes & Inclusion Bodies in Prokaryotes',
+    badge: 'Prokaryotic Organelles',
+    paragraphs: [
+      'Mesosomes are plasma membrane infoldings (vesicles, tubules, lamellae) aiding cell wall formation, DNA replication, respiration, and secretion.',
+      'In cyanobacteria, chromatophores contain photosynthetic pigments.',
+      'Ribosomes are 70S (50S and 30S subunits). Several ribosomes attach to single mRNA forming polyribosome/polysome to translate mRNA into proteins.',
+    ],
+    bulletPoints: [
+      'Bacteria can be Gram positive or Gram negative based on cell envelope differences.',
+      'Motility flagella consist of three parts: filament, hook, and basal body. Pili and fimbriae do not play role in motility.',
+      'Inclusion bodies: reserve material stored in prokaryotic cytoplasm (phosphate granules, cyanophycean granules, glycogen granules).',
+    ],
+  },
+  {
+    pageNumber: 5,
+    sectionTitle: '6. Eukaryotic Cells & Fluid Mosaic Cell Membrane',
+    badge: 'Eukaryotic Membrane',
+    paragraphs: [
+      'Eukaryotes include protists, plants, animals, and fungi, featuring compartmentalization via membrane-bound organelles.',
+      'Plant cells have large vacuoles and cell walls; animal cells have centrioles which are absent in higher plants.',
+      'Singer and Nicolson (1972) proposed the widely accepted Fluid Mosaic Model for the structure of cell membrane.',
+    ],
+    bulletPoints: [
+      'Eukaryotic cytoplasmic ribosomes are 80S (small 40S + large 60S).',
+      'Human RBC membrane composition: 52% proteins, 40% lipids.',
+      'Phospholipids consist of polar head (outward) and non-polar tail (hydrophobic) on inner side.',
+      'Membrane proteins can be integral or peripheral.',
+    ],
+  },
+  {
+    pageNumber: 6,
+    sectionTitle: '7. Cell Wall & Membrane Transport Mechanisms',
+    badge: 'Cell Wall & Transport',
+    paragraphs: [
+      'Plasma membrane is selectively permeable. Passive transport requires no energy; movement of water by diffusion is osmosis.',
+      'Active transport requires ATP energy (e.g., Na+/K+ pump) against concentration gradient.',
+      'Non-living rigid cell wall forms outer covering of plasma membrane in plants and fungi.',
+    ],
+    bulletPoints: [
+      'The middle lamella is a layer mainly of calcium pectate gluing neighboring cells.',
+      'Primary cell wall of young plant cells is capable of growth; diminishes as secondary wall forms on inner side.',
+      'Algal cell wall: cellulose, galactans, mannans, and calcium carbonate.',
+      'Higher plant cell wall: cellulose, hemicellulose, pectin, and proteins.',
+    ],
+  },
+  {
+    pageNumber: 7,
+    sectionTitle: '8. Endomembrane System (ER, Golgi & Lysosomes)',
+    badge: 'Endomembrane System',
+    paragraphs: [
+      'Endomembrane system includes membranous organelles whose functions are coordinated: ER, Golgi complex, lysosomes, and vacuoles.',
+      'Endoplasmic Reticulum (ER): Rough ER (RER, bearing ribosomes) for protein synthesis; Smooth ER (SER) for lipid/steroid synthesis.',
+      'Golgi apparatus (Camillo Golgi): Concentrically arranged cisternae with convex cis (forming) and concave trans (maturing) faces.',
+    ],
+    bulletPoints: [
+      'Golgi apparatus functions: Packaging of materials, formation of glycoproteins and glycolipids.',
+      'Lysosomes: Membrane-bound vesicular structures rich in hydrolytic enzymes (lipases, proteases, carbohydrases) active at acidic pH.',
+    ],
+  },
+  {
+    pageNumber: 8,
+    sectionTitle: 'Vacuoles & 9. Mitochondria (Powerhouse of the Cell)',
+    badge: 'Vacuoles & Mitochondria',
+    paragraphs: [
+      'Vacuole is bound by tonoplast membrane. In Amoeba, contractile vacuole is important for excretion/osmoregulation.',
+      'Mitochondria are double membrane-bound sites of aerobic cellular respiration generating ATP ("power house of the cell").',
+      'Outer membrane forms continuous boundary; inner membrane forms folds called cristae to increase surface area.',
+    ],
+    bulletPoints: [
+      'Mitochondrial matrix contains single circular dsDNA, RNA molecules, 70S ribosomes, and divides by fission.',
+      'Svedberg unit (S) stands for sedimentation coefficient (indirect measure of density and size).',
+    ],
+  },
+  {
+    pageNumber: 9,
+    sectionTitle: '10. Plastids (Chloroplasts) & 11. Cytoskeleton',
+    badge: 'Plastids & Cytoskeleton',
+    paragraphs: [
+      'Plastids found in plant cells and euglenoids: Chloroplasts (green chlorophyll/carotenoids), Chromoplasts (carotenoid pigments), Leucoplasts (colourless storage).',
+      'Leucoplasts: Amyloplasts (starch), Elaioplasts (fats/oils), Aleuroplasts (proteins).',
+      'Chloroplast: double-membrane, stroma matrix, thylakoid stacks (grana) linked by stroma lamellae.',
+    ],
+    bulletPoints: [
+      'Stroma contains circular DNA, 70S ribosomes, and enzymes for carbohydrate and protein synthesis.',
+      'Cytoskeleton: Elaborate network of filamentous proteinaceous structures providing mechanical support, motility, and cell shape.',
+    ],
+  },
+  {
+    pageNumber: 10,
+    sectionTitle: '12. Cilia & Flagella (9+2 Array) & 13. Centrosome',
+    badge: 'Cilia, Flagella & Centrioles',
+    paragraphs: [
+      'Cilia and flagella are hair-like outgrowths of cell membrane. Central core (axoneme) features 9 doublet microtubules peripherally and 1 pair centrally (9 + 2 array).',
+      'Cilia and flagella arise from centriole-like basal bodies covered with plasma membrane.',
+      'Centrosome contains two cylindrical centrioles perpendicular to each other surrounded by amorphous pericentriolar material.',
+    ],
+    bulletPoints: [
+      'Centriole has cartwheel hub with 9 peripheral triplets connected by protein radial spokes.',
+      'Centrioles form basal bodies of cilia/flagella and spindle apparatus during cell division.',
+    ],
+  },
+  {
+    pageNumber: 11,
+    sectionTitle: '14. Nucleus (Chromatin, Nucleolus & Chromosomes)',
+    badge: 'Nucleus & Chromosomes',
+    paragraphs: [
+      'Nucleus first described by Robert Brown (1831); chromatin named by Flemming. Double membrane separated by perinuclear space.',
+      'Nuclear matrix (nucleoplasm) contains nucleolus (active site for rRNA synthesis) and chromatin (DNA, histones, non-histones, RNA).',
+      'Chromosomes classified by centromere position: Metacentric (middle), Sub-metacentric (slightly away from middle), Acrocentric (close to end), Telocentric (terminal).',
+    ],
+    bulletPoints: [
+      'Kinetochores: Disc-shaped structures present on sides of primary constriction (centromere).',
+      'Secondary constrictions give appearance of a small fragment called satellite chromosome.',
+    ],
+  },
+  {
+    pageNumber: 12,
+    sectionTitle: '15. Microbodies & Summary Revision',
+    badge: 'Microbodies & Wrap-up',
+    paragraphs: [
+      'Nucleolus is not membrane-bound; highly active in cells carrying out rapid protein synthesis.',
+      'Microbodies: Membrane-bound minute vesicles containing various enzymes, present in both plant and animal cells.',
+      'Summary: Cell is the structural and functional unit of life; master the organelle differences for NEET.',
+    ],
+    bulletPoints: [
+      'Prokaryotes vs Eukaryotes: 70S vs 80S ribosomes, lack of nuclear membrane vs organized nucleus.',
+      'Semi-autonomous organelles: Mitochondria and chloroplasts contain circular DNA and 70S ribosomes.',
+    ],
+  },
+];
 
 export async function getNotes(req: AuthRequest, res: Response) {
   try {
@@ -492,34 +675,235 @@ export async function getPreview(req: Request, res: Response) {
       return res.status(404).json({ success: false, message: 'Note not found.' });
     }
 
+    let renderedInfo = null;
+    if (note.pdf_file) {
+      renderedInfo = await getOrRenderPdfPages(note.pdf_file);
+    }
+
+    const totalPages = renderedInfo?.totalPages || note.total_pages || 12;
+    const previewPagesCount = Math.min(note.preview_pages || 4, totalPages);
+
+    const isCellChapter =
+      (note.chapter || '').toLowerCase().includes('cell') ||
+      (note.title || '').toLowerCase().includes('cell');
+
+    let previewSamples: any[] = [];
+    if (renderedInfo && renderedInfo.pages.length > 0) {
+      previewSamples = renderedInfo.pages.slice(0, previewPagesCount).map((p, idx) => {
+        const meta = (isCellChapter && CELL_UNIT_OF_LIFE_PAGES[idx]) ? CELL_UNIT_OF_LIFE_PAGES[idx] : null;
+        return {
+          pageNumber: p.pageNumber,
+          imageUrl: p.imageUrl,
+          title: meta ? meta.sectionTitle : `Preview Page ${p.pageNumber}: ${note.chapter || note.title}`,
+          contentSnippet: meta ? meta.paragraphs[0] : `High-Yield NCERT Summary Points for NEET: Key definitions, formula breakdown, and high-frequency question trends.`,
+        };
+      });
+    } else {
+      previewSamples = [
+        {
+          pageNumber: 1,
+          title: isCellChapter ? CELL_UNIT_OF_LIFE_PAGES[0].sectionTitle : `Chapter Overview: ${note.chapter}`,
+          contentSnippet: isCellChapter ? CELL_UNIT_OF_LIFE_PAGES[0].paragraphs[0] : `High-Yield NCERT Summary Points for NEET: Key definitions, formula breakdown, and high-frequency previous 15-year question trends.`,
+        },
+        {
+          pageNumber: 2,
+          title: isCellChapter ? CELL_UNIT_OF_LIFE_PAGES[1].sectionTitle : `Essential Formulae & Memory Tricks`,
+          contentSnippet: isCellChapter ? CELL_UNIT_OF_LIFE_PAGES[1].paragraphs[0] : `Arrow-pushing flowcharts, standard mnemonic shortcuts, sign conventions, and unit conversion cheat sheets.`,
+        },
+        {
+          pageNumber: 3,
+          title: isCellChapter ? CELL_UNIT_OF_LIFE_PAGES[2].sectionTitle : `Solved Illustrative Exemplar Problems`,
+          contentSnippet: isCellChapter ? CELL_UNIT_OF_LIFE_PAGES[2].paragraphs[0] : `Step-by-step solutions for tricky multi-statement and assertion-reason type questions with NCERT page references.`,
+        },
+      ];
+    }
+
     return res.json({
       success: true,
       noteId: note.id,
       title: note.title,
       subject: note.subject,
       chapter: note.chapter,
-      previewPages: note.preview_pages || 4,
-      totalPages: note.total_pages || 45,
-      previewSamples: [
-        {
-          pageNumber: 1,
-          title: `Chapter Overview: ${note.chapter}`,
-          contentSnippet: `High-Yield NCERT Summary Points for NEET: Key definitions, formula breakdown, and high-frequency previous 15-year question trends.`,
-        },
-        {
-          pageNumber: 2,
-          title: `Essential Formulae & Memory Tricks`,
-          contentSnippet: `Arrow-pushing flowcharts, standard mnemonic shortcuts, sign conventions, and unit conversion cheat sheets.`,
-        },
-        {
-          pageNumber: 3,
-          title: `Solved Illustrative Exemplar Problems`,
-          contentSnippet: `Step-by-step solutions for tricky multi-statement and assertion-reason type questions with NCERT page references.`,
-        },
-      ],
+      previewPages: previewPagesCount,
+      totalPages: totalPages,
+      previewSamples,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to generate preview.' });
+  }
+}
+
+// Full Secure In-App Reader Content (Protected with User Watermark & Ownership Verification)
+export async function getReaderContent(req: AuthRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'You must be logged in to access the online study reader.',
+      });
+    }
+
+    const noteId = parseInt(req.params.id, 10);
+    if (!noteId) {
+      return res.status(400).json({ success: false, message: 'Invalid note ID.' });
+    }
+
+    let note: any = null;
+
+    if (isMySQLConnected()) {
+      const pool = getPool();
+      if (pool) {
+        const [nRows]: any = await pool.query('SELECT * FROM notes WHERE id = ?', [noteId]);
+        if (nRows.length > 0) note = nRows[0];
+      }
+    } else {
+      note = memoryStore.notes.find((n) => n.id === noteId);
+    }
+
+    if (!note) {
+      return res.status(404).json({ success: false, message: 'Note not found.' });
+    }
+
+    // Check authorization: free note, admin role, or paid order
+    const isFree = Boolean(note.is_free);
+    let isAuthorized = isFree || req.user.role === 'admin';
+    let orderNumber = 'FREE-ACCESS';
+
+    if (!isAuthorized) {
+      if (isMySQLConnected()) {
+        const pool = getPool();
+        if (pool) {
+          const [oRows]: any = await pool.query(
+            'SELECT o.id, o.order_number FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND oi.note_id = ? AND o.payment_status = "paid"',
+            [req.user.id, noteId]
+          );
+          if (oRows.length > 0) {
+            isAuthorized = true;
+            orderNumber = oRows[0].order_number;
+          }
+        }
+      } else {
+        const paidOrders = memoryStore.orders.filter(
+          (o) => o.user_id === req.user?.id && o.payment_status === 'paid'
+        );
+        const paidOrderIds = paidOrders.map((o) => o.id);
+        const item = memoryStore.order_items.find(
+          (oi) => paidOrderIds.includes(oi.order_id) && oi.note_id === noteId
+        );
+        if (item) {
+          isAuthorized = true;
+          const matchedOrder = paidOrders.find((o) => o.id === item.order_id);
+          orderNumber = matchedOrder?.order_number || `ORD-${item.order_id}`;
+        }
+      }
+    }
+
+    if (!isAuthorized) {
+      return res.status(403).json({
+        success: false,
+        message:
+          'Access Denied: This premium note is locked. Please purchase and wait for payment verification to unlock the secure reader.',
+      });
+    }
+
+    // Process PDF rendering if available
+    let renderedInfo = null;
+    if (note.pdf_file) {
+      renderedInfo = await getOrRenderPdfPages(note.pdf_file);
+    }
+
+    const isCellChapter =
+      (note.chapter || '').toLowerCase().includes('cell') ||
+      (note.title || '').toLowerCase().includes('cell');
+
+    let totalPages = note.total_pages || 12;
+    let pages: any[] = [];
+
+    if (renderedInfo && renderedInfo.totalPages > 0) {
+      totalPages = renderedInfo.totalPages;
+      note.total_pages = totalPages;
+
+      pages = renderedInfo.pages.map((pInfo, idx) => {
+        const pageNum = pInfo.pageNumber;
+        if (isCellChapter && CELL_UNIT_OF_LIFE_PAGES[idx]) {
+          const meta = CELL_UNIT_OF_LIFE_PAGES[idx];
+          return {
+            ...meta,
+            pageNumber: pageNum,
+            imageUrl: pInfo.imageUrl,
+          };
+        }
+
+        return {
+          pageNumber: pageNum,
+          imageUrl: pInfo.imageUrl,
+          sectionTitle: `Page ${pageNum}: ${note.chapter || note.title} (Part ${pageNum})`,
+          badge: `Study Page ${pageNum}`,
+          paragraphs: [
+            `High-yield study notes for ${note.chapter || note.title} - Page ${pageNum} of ${totalPages}.`,
+            `Key concepts verified against NCERT guidelines for NEET & Board examinations.`,
+          ],
+          bulletPoints: [
+            `Core Concept #${pageNum}.1: Review fundamental mechanisms and diagrams carefully.`,
+            `Key Exam Point #${pageNum}.2: Verify formulas, exceptions, and high-frequency PYQ trends.`,
+            `Standard syllabus guideline for ${note.subject || 'NEET Prep'}.`,
+          ],
+        };
+      });
+    } else if (isCellChapter) {
+      totalPages = CELL_UNIT_OF_LIFE_PAGES.length;
+      pages = CELL_UNIT_OF_LIFE_PAGES;
+    } else {
+      totalPages = Math.max(6, Math.min(12, note.total_pages || 8));
+      pages = Array.from({ length: totalPages }, (_, i) => ({
+        pageNumber: i + 1,
+        sectionTitle: `Section ${i + 1}: ${note.chapter || note.title}`,
+        badge: `High-Yield Part ${i + 1}`,
+        paragraphs: [
+          `Master syllabus notes for ${note.chapter || note.title} (${note.subject || 'NEET'}).`,
+          `Essential concepts arranged in sequence for maximum retention.`,
+        ],
+        bulletPoints: [
+          'Direct Assertion & Reason links with line-by-line NCERT references.',
+          'Critical exceptions and high-negative-marking traps flagged by top rankers.',
+          'Formulae arranged in increasing complexity with dimensional shortcuts.',
+        ],
+        infobox: {
+          title: 'Exam Target Strategy',
+          text: 'Master primary conceptual mechanisms first, then complete the timed self-test drill.',
+        },
+      }));
+    }
+
+    const watermarkText = `LICENSED TO: ${req.user.name.toUpperCase()} • ${req.user.email} • ${req.user.phone ? `PH: ${req.user.phone}` : 'VERIFIED STUDENT'} • ORDER: #${orderNumber} • UID: #${req.user.id}`;
+
+    return res.json({
+      success: true,
+      note: {
+        id: note.id,
+        title: note.title,
+        subject: note.subject,
+        chapter: note.chapter,
+        class_level: note.class_level || 'NEET',
+        author_name: note.author_name,
+        total_pages: totalPages,
+        order_number: orderNumber,
+        pdf_file: note.pdf_file,
+      },
+      license: {
+        userName: req.user.name,
+        userEmail: req.user.email,
+        userPhone: req.user.phone || '',
+        userId: req.user.id,
+        orderNumber,
+        watermarkText,
+        unlockedAt: new Date().toISOString(),
+      },
+      pages,
+    });
+  } catch (error: any) {
+    console.error('[Reader Content Error]', error);
+    return res.status(500).json({ success: false, message: 'Failed to load reader content.' });
   }
 }
 

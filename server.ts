@@ -30,6 +30,7 @@ async function startServer() {
   // Static route for public thumbnails and previews
   app.use('/backend/uploads/thumbnails', express.static(path.join(process.cwd(), 'backend', 'uploads', 'thumbnails')));
   app.use('/backend/uploads/previews', express.static(path.join(process.cwd(), 'backend', 'uploads', 'previews')));
+  app.use('/backend/uploads/rendered_pages', express.static(path.join(process.cwd(), 'backend', 'uploads', 'rendered_pages')));
 
   // Health and System Diagnostics
   app.get('/api/health', (req, res) => {

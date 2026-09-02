@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Send,
   Lock,
+  BookOpen,
 } from 'lucide-react';
 import { Note, Review, User } from '../types';
 import { api } from '../services/api';
@@ -23,6 +24,7 @@ interface NoteDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPreview: (note: Note) => void;
+  onOpenReader?: (note: Note) => void;
   onAddToCart: (note: Note) => void;
   onBuyNow: (note: Note) => void;
   onToggleWishlist: (noteId: number) => void;
@@ -36,6 +38,7 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   isOpen,
   onClose,
   onPreview,
+  onOpenReader,
   onAddToCart,
   onBuyNow,
   onToggleWishlist,
@@ -45,6 +48,7 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
 }) => {
   const [noteData, setNoteData] = useState<Note | null>(null);
   const [isPurchased, setIsPurchased] = useState(false);
+  const [allowPdfDownloads, setAllowPdfDownloads] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [relatedNotes, setRelatedNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,6 +64,12 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
 
     let isMounted = true;
     setIsLoading(true);
+
+    api.getSettings().then((s) => {
+      if (isMounted && s?.settings) {
+        setAllowPdfDownloads(s.settings.allow_pdf_downloads === '1');
+      }
+    });
 
     api.getNoteById(noteId).then((res) => {
       if (isMounted && res.success) {
@@ -242,14 +252,29 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                     </button>
 
                     {isPurchased ? (
-                      <button
-                        id="detail-download-btn"
-                        onClick={handleDownload}
-                        className="col-span-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>Download Full Study PDF</span>
-                      </button>
+                      <div className="col-span-2 space-y-2">
+                        <button
+                          id="detail-read-online-btn"
+                          onClick={() => {
+                            if (onOpenReader) onOpenReader(noteData);
+                            else onPreview(noteData);
+                          }}
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <BookOpen className="w-4 h-4" />
+                          <span>Read Complete Notes Online</span>
+                        </button>
+                        {allowPdfDownloads && (
+                          <button
+                            id="detail-download-btn"
+                            onClick={handleDownload}
+                            className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <Download className="w-4 h-4" />
+                            <span>Download Raw PDF</span>
+                          </button>
+                        )}
+                      </div>
                     ) : noteData.is_free ? (
                       <button
                         id="detail-claim-free-btn"

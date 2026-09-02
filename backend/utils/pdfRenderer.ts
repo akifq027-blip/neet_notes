@@ -1,0 +1,92 @@
+import fs from 'fs';
+import path from 'path';
+import { exec } from 'child_process';
+import util from 'util';
+
+const execPromise = util.promisify(exec);
+
+export interface RenderedPdfInfo {
+  success: boolean;
+  totalPages: number;
+  filenameBase: string;
+  pages: {
+    pageNumber: number;
+    imageUrl: string;
+  }[];
+}
+
+/**
+ * Gets real page count of a PDF file using Ghostscript or fallback
+ */
+export async function getPdfPageCount(pdfFilePath: string): Promise<number> {
+  try {
+    if (!fs.existsSync(pdfFilePath)) return 0;
+    const cmd = `gs -dNOSAFER -q -dNODISPLAY -c "(${pdfFilePath.replace(/\\/g, '/')}) (r) file runpdfbegin pdfpagecount = quit"`;
+    const { stdout } = await execPromise(cmd);
+    const count = parseInt(stdout.trim(), 10);
+    return isNaN(count) || count <= 0 ? 0 : count;
+  } catch (err) {
+    console.warn('[PDF Page Count Error]', err);
+    return 0;
+  }
+}
+
+/**
+ * Renders all pages of a PDF to high-resolution PNGs and caches them
+ */
+export async function getOrRenderPdfPages(pdfFilename: string): Promise<RenderedPdfInfo | null> {
+  try {
+    if (!pdfFilename) return null;
+
+    const pdfPath = path.join(process.cwd(), 'backend', 'uploads', 'pdfs', pdfFilename);
+    if (!fs.existsSync(pdfPath)) {
+      return null;
+    }
+
+    const filenameBase = path.basename(pdfFilename, path.extname(pdfFilename));
+    const renderDir = path.join(process.cwd(), 'backend', 'uploads', 'rendered_pages', filenameBase);
+
+    if (!fs.existsSync(renderDir)) {
+      fs.mkdirSync(renderDir, { recursive: true });
+    }
+
+    // Check existing rendered pages
+    const existingFiles = fs.readdirSync(renderDir).filter(f => f.startsWith('page_') && f.endsWith('.png'));
+
+    let totalPages = existingFiles.length;
+
+    if (totalPages === 0) {
+      // Determine page count
+      const detectedCount = await getPdfPageCount(pdfPath);
+      
+      // Render pages using Ghostscript at 150 DPI for crystal clear text
+      const outputPattern = path.join(renderDir, 'page_%02d.png').replace(/\\/g, '/');
+      const renderCmd = `gs -dNOPAUSE -dBATCH -sDEVICE=png16m -r150 -sOutputFile="${outputPattern}" "${pdfPath.replace(/\\/g, '/')}"`;
+      
+      await execPromise(renderCmd);
+
+      const generatedFiles = fs.readdirSync(renderDir).filter(f => f.startsWith('page_') && f.endsWith('.png'));
+      totalPages = generatedFiles.length || detectedCount || 1;
+    }
+
+    const pages = [];
+    for (let i = 1; i <= totalPages; i++) {
+      const pageStr = i.toString().padStart(2, '0');
+      const filename = `page_${pageStr}.png`;
+      pages.push({
+        pageNumber: i,
+        imageUrl: `/backend/uploads/rendered_pages/${filenameBase}/${filename}`,
+      });
+    }
+
+    return {
+      success: true,
+      totalPages,
+      filenameBase,
+      pages,
+    };
+  } catch (err) {
+    console.error('[PDF Render Error]', err);
+    return null;
+  }
+}

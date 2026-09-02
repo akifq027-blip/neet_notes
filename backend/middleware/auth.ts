@@ -11,6 +11,7 @@ export interface AuthUser {
   id: number;
   name: string;
   email: string;
+  phone?: string;
   role: 'student' | 'admin';
 }
 
@@ -20,7 +21,7 @@ export interface AuthRequest extends Request {
 
 export function generateToken(user: AuthUser): string {
   return jwt.sign(
-    { id: user.id, name: user.name, email: user.email, role: user.role },
+    { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role },
     JWT_SECRET,
     { expiresIn: '7d' }
   );

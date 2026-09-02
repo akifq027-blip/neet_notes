@@ -29,6 +29,7 @@ interface StudentDashboardProps {
   initialTab?: 'library' | 'orders' | 'wishlist' | 'profile';
   onNavigate: (view: string, param?: any) => void;
   onPreviewNote: (note: Note) => void;
+  onOpenReader?: (note: Note) => void;
   onAddToCart: (note: Note) => void;
   onUpdateUser: (updated: User) => void;
 }
@@ -38,6 +39,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   initialTab = 'library',
   onNavigate,
   onPreviewNote,
+  onOpenReader,
   onAddToCart,
   onUpdateUser,
 }) => {
@@ -47,6 +49,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [wishlistNotes, setWishlistNotes] = useState<Note[]>([]);
   const [searchLibrary, setSearchLibrary] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [allowPdfDownloads, setAllowPdfDownloads] = useState<boolean>(false);
 
   // Profile form
   const [name, setName] = useState(user.name);
@@ -68,14 +71,61 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     setActiveTab(initialTab);
   }, [initialTab]);
 
+  const handleLaunchReader = (note: Note) => {
+    if (onOpenReader) {
+      onOpenReader(note);
+    } else {
+      onPreviewNote(note);
+    }
+  };
+
+  const handleLaunchReaderByNoteId = (noteId: number, noteTitle: string) => {
+    const found = libraryNotes.find((n) => n.id === noteId);
+    if (found) {
+      handleLaunchReader(found);
+    } else {
+      const synNote: Note = {
+        id: noteId,
+        title: noteTitle,
+        slug: `note-${noteId}`,
+        description: 'Unlocked study note in your student library.',
+        subject: 'Study Material',
+        chapter: noteTitle,
+        category_id: 1,
+        price: 0,
+        original_price: 0,
+        thumbnail: '',
+        pdf_file: '',
+        preview_pages: 4,
+        total_pages: 8,
+        is_free: 0,
+        is_featured: 0,
+        is_bestseller: 0,
+        author_name: 'NEET Faculty',
+        rating_avg: 5,
+        rating_count: 1,
+        purchase_count: 1,
+        download_count: 0,
+        status: 'published',
+        created_at: new Date().toISOString(),
+      };
+      handleLaunchReader(synNote);
+    }
+  };
+
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [libRes, ordRes, allNotesRes] = await Promise.all([
+      const [libRes, ordRes, allNotesRes, settingsRes] = await Promise.all([
         api.getLibrary(),
         api.getOrders(),
         api.getNotes({ limit: 150 }),
+        api.getSettings(),
       ]);
+
+      if (settingsRes && settingsRes.success && settingsRes.settings) {
+        setAllowPdfDownloads(settingsRes.settings.allow_pdf_downloads === '1');
+      }
 
       const freshCatalog = allNotesRes.success && Array.isArray(allNotesRes.notes) ? allNotesRes.notes : [];
       const catalogMap = new Map<number, Note>(freshCatalog.map((n) => [n.id, n]));
@@ -434,22 +484,34 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                     <p className="text-xs text-slate-500 line-clamp-2 mb-4">{note.description}</p>
                   </div>
 
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                     <button
-                      onClick={() => onPreviewNote(note)}
-                      className="text-xs text-slate-600 hover:text-slate-900 font-semibold px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-1"
+                      id={`library-read-online-btn-${note.id}`}
+                      onClick={() => handleLaunchReader(note)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer flex-1 justify-center"
                     >
-                      <Eye className="w-3.5 h-3.5" />
+                      <BookOpen className="w-4 h-4" />
                       <span>Read Online</span>
                     </button>
-                    <button
-                      id={`library-download-btn-${note.id}`}
-                      onClick={() => handleDownload(note.id)}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download PDF</span>
-                    </button>
+                    {allowPdfDownloads ? (
+                      <button
+                        id={`library-download-btn-${note.id}`}
+                        onClick={() => handleDownload(note.id)}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                        title="Download Raw PDF"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Download</span>
+                      </button>
+                    ) : (
+                      <span
+                        className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1.5 rounded-lg flex items-center gap-1"
+                        title="Protected against piracy: In-app reader with dynamic watermark"
+                      >
+                        <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                        <span>Online Only</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -647,16 +709,34 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                           <span className="text-[11px] text-slate-500">₹{item.price}</span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap justify-end">
                           {ord.payment_status === 'paid' ? (
                             <>
                               <button
-                                onClick={() => handleDownload(item.note_id)}
-                                className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                                id={`order-read-btn-${item.note_id}`}
+                                onClick={() => handleLaunchReaderByNoteId(item.note_id, item.note_title)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
                               >
-                                <Download className="w-3.5 h-3.5" />
-                                <span>Download PDF</span>
+                                <BookOpen className="w-3.5 h-3.5" />
+                                <span>Read Online</span>
                               </button>
+                              {allowPdfDownloads ? (
+                                <button
+                                  onClick={() => handleDownload(item.note_id)}
+                                  className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Download PDF</span>
+                                </button>
+                              ) : (
+                                <span
+                                  className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md flex items-center gap-1"
+                                  title="In-app reading mode active with anti-piracy watermarking"
+                                >
+                                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                  <span>Online Only</span>
+                                </span>
+                              )}
                               <button
                                 onClick={() => handleOpenRefund(ord, item.note_id)}
                                 className="text-slate-400 hover:text-rose-600 text-xs px-2 py-1 transition-colors cursor-pointer"

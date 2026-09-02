@@ -713,10 +713,10 @@ export async function initDatabase() {
       price: 1.00,
       original_price: 99.00,
       thumbnail: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=80',
-      pdf_file: 'Biology_Notes__Cell___The_Unit_of_Life-1788364226209-967035391.pdf',
+      pdf_file: 'Biology_Notes__Cell___The_Unit_of_Life-1788374983372-550503813.pdf',
       preview_file: null,
-      preview_pages: 3,
-      total_pages: 45,
+      preview_pages: 4,
+      total_pages: 12,
       file_size_mb: 1.14,
       is_free: 0,
       is_featured: 1,
@@ -816,6 +816,7 @@ export async function initDatabase() {
     support_email: 'akifquadri5604@gmail.com',
     support_phone: '+91 7989725471',
     maintenance_mode: 'false',
+    allow_pdf_downloads: '0', // '0' = Online Reading Only (Strict Anti-Piracy Mode), '1' = Allow PDF Downloads alongside Online Reader
     announcement_bar: '🚀 NCERT NOTES 2026: Use code NCERT20 for 20% OFF on all study materials across Class 8–12 & NEET!',
     currency_symbol: '₹',
   };

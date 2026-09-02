@@ -636,10 +636,10 @@ export let FALLBACK_NOTES: Note[] = [
     price: 1.00,
     original_price: 99.00,
     thumbnail: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=80',
-    pdf_file: 'Biology_Notes__Cell___The_Unit_of_Life-1788364226209-967035391.pdf',
+    pdf_file: 'Biology_Notes__Cell___The_Unit_of_Life-1788374983372-550503813.pdf',
     preview_file: 'free-cell-preview.pdf',
-    preview_pages: 3,
-    total_pages: 45,
+    preview_pages: 4,
+    total_pages: 12,
     file_size_mb: 1.14,
     is_free: 0,
     is_featured: 1,
@@ -663,6 +663,17 @@ function initStoredNotes(): Note[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // Ensure Note 21 is always synchronized with the uploaded 12-page PDF
+        const targetFallback = FALLBACK_NOTES.find(n => n.id === 21);
+        const idx = parsed.findIndex((n: Note) => n.id === 21);
+        if (targetFallback) {
+          if (idx >= 0) {
+            parsed[idx] = { ...parsed[idx], ...targetFallback };
+          } else {
+            parsed.push(targetFallback);
+          }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        }
         return parsed;
       }
     }
@@ -681,6 +692,12 @@ export function getFallbackNotes(): Note[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        const targetFallback = FALLBACK_NOTES.find(n => n.id === 21);
+        const idx = parsed.findIndex((n: Note) => n.id === 21);
+        if (targetFallback && idx >= 0 && parsed[idx].total_pages !== 12) {
+          parsed[idx] = { ...parsed[idx], ...targetFallback };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        }
         FALLBACK_NOTES = parsed;
         return parsed;
       }

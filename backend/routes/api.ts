@@ -32,6 +32,8 @@ router.get('/notes', notesCtrl.getNotes);
 router.get('/notes/:id', notesCtrl.getNoteById);
 router.get('/notes/:id/preview', notesCtrl.getPreview);
 router.get('/notes/:id/download', requireAuth, notesCtrl.downloadNote);
+router.get('/notes/:id/reader-content', requireAuth, notesCtrl.getReaderContent);
+router.get('/notes/:id/reader', requireAuth, notesCtrl.getReaderContent);
 router.get('/categories', notesCtrl.getCategories);
 router.post('/wishlist/toggle', requireAuth, notesCtrl.toggleWishlist);
 router.get('/library', requireAuth, notesCtrl.getStudentLibrary);
