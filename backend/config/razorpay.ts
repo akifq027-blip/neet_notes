@@ -10,6 +10,9 @@ const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '';
 let razorpayInstance: Razorpay | null = null;
 
 export function isRazorpayConfigured(): boolean {
+  if (process.env.ENABLE_RAZORPAY !== 'true') {
+    return false;
+  }
   if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) return false;
   const key = RAZORPAY_KEY_ID.trim();
   const secret = RAZORPAY_KEY_SECRET.trim();
@@ -17,9 +20,9 @@ export function isRazorpayConfigured(): boolean {
   if (
     key.includes('YourKeyId') ||
     secret.includes('YourKeySecret') ||
+    key.startsWith('rzp_test_') ||
     key.length < 10 ||
-    secret.length < 10 ||
-    key === 'rzp_test_TW9S6IV6qcqE6z' // placeholder test key
+    secret.length < 10
   ) {
     return false;
   }

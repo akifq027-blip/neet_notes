@@ -205,9 +205,8 @@ export async function createCheckoutOrder(req: AuthRequest, res: Response) {
         if (rzpOrder && rzpOrder.id) {
           razorpayOrderId = rzpOrder.id;
         }
-      } catch (rzpErr: any) {
-        // Gracefully ignore external gateway auth issues and proceed with order reference
-        console.warn('[Payment Notice] Using direct order reference:', rzpErr?.error?.description || rzpErr?.message || 'Gateway bypassed');
+      } catch {
+        // Continue with local order draft
       }
     }
 

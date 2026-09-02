@@ -78,6 +78,7 @@ export function App() {
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'admin'>('login');
+  const [reopenCheckoutAfterAuth, setReopenCheckoutAfterAuth] = useState(false);
   const [previewNote, setPreviewNote] = useState<Note | null>(null);
   const [detailNoteId, setDetailNoteId] = useState<number | null>(null);
 
@@ -176,7 +177,13 @@ export function App() {
       if (exists) return prev;
       return [...prev, { note, quantity: 1 }];
     });
-    setIsCheckoutOpen(true);
+    if (!currentUser) {
+      setReopenCheckoutAfterAuth(true);
+      setAuthMode('login');
+      setIsAuthOpen(true);
+    } else {
+      setIsCheckoutOpen(true);
+    }
   };
 
   const handleRemoveCartItem = (noteId: number) => {
@@ -201,7 +208,10 @@ export function App() {
   // Auth Handlers
   const handleAuthSuccess = (user: User) => {
     setCurrentUser(user);
-    if (user.role === 'admin' && authMode === 'admin') {
+    if (reopenCheckoutAfterAuth) {
+      setReopenCheckoutAfterAuth(false);
+      setIsCheckoutOpen(true);
+    } else if (user.role === 'admin' && authMode === 'admin') {
       setCurrentView('admin');
     }
   };
@@ -749,7 +759,13 @@ export function App() {
         onProceedToCheckout={(coupon) => {
           setAppliedCoupon(coupon);
           setIsCartOpen(false);
-          setIsCheckoutOpen(true);
+          if (!currentUser) {
+            setReopenCheckoutAfterAuth(true);
+            setAuthMode('login');
+            setIsAuthOpen(true);
+          } else {
+            setIsCheckoutOpen(true);
+          }
         }}
         onBrowseNotes={() => handleNavigate('notes')}
       />
@@ -763,6 +779,7 @@ export function App() {
         user={currentUser}
         onOpenAuth={() => {
           setIsCheckoutOpen(false);
+          setReopenCheckoutAfterAuth(true);
           setAuthMode('login');
           setIsAuthOpen(true);
         }}
@@ -775,7 +792,10 @@ export function App() {
       {/* 5. Auth Modal (Login / Register / Faculty Admin) */}
       <AuthModal
         isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
+        onClose={() => {
+          setIsAuthOpen(false);
+          setReopenCheckoutAfterAuth(false);
+        }}
         initialMode={authMode}
         onAuthSuccess={handleAuthSuccess}
       />

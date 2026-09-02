@@ -26,6 +26,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [couponError, setCouponError] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+  const [isSubmittingCheckout, setIsSubmittingCheckout] = useState(false);
 
   if (!isOpen) return null;
 
@@ -250,14 +251,31 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
               <button
                 id="cart-checkout-btn"
-                onClick={() => {
-                  onClose();
+                type="button"
+                disabled={isSubmittingCheckout}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (isSubmittingCheckout) return;
+                  setIsSubmittingCheckout(true);
                   onProceedToCheckout(appliedCoupon);
+                  setTimeout(() => {
+                    setIsSubmittingCheckout(false);
+                  }, 600);
                 }}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-75 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
               >
-                <span>Proceed to Secure Checkout (₹{finalTotal})</span>
-                <ArrowRight className="w-4 h-4" />
+                {isSubmittingCheckout ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Opening Checkout...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Proceed to Secure Checkout (₹{finalTotal})</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
 
               <div className="flex items-center justify-center gap-2 text-[11px] text-slate-500 font-medium">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import QRCode from 'qrcode';
 import {
   X,
@@ -50,6 +50,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [isVerifyingUpi, setIsVerifyingUpi] = useState(false);
 
+  // Stable fallback reference to prevent constantly recalculating Date.now()
+  const stableFallbackRef = useRef<string>('');
+  useEffect(() => {
+    if (isOpen) {
+      if (!stableFallbackRef.current) {
+        stableFallbackRef.current = `ORD${Date.now().toString().slice(-6)}`;
+      }
+    } else {
+      stableFallbackRef.current = '';
+    }
+  }, [isOpen]);
+
   const subtotal = items.reduce(
     (sum, item) => sum + (item.note.is_free ? 0 : item.note.price * item.quantity),
     0
@@ -68,13 +80,31 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const formattedAmount = finalAmount.toFixed(2);
   const merchantUpi = orderDraft?.upiConfig?.merchantUpiId || 'akifq027-1@okhdfcbank';
   const merchantName = orderDraft?.upiConfig?.merchantName || 'NEET Notes HQ';
-  const orderRef = orderDraft?.orderNumber || `ORD${Date.now().toString().slice(-6)}`;
+
+  // Stabilize orderRef using useMemo and stable fallback
+  const orderRef = useMemo(() => {
+    if (orderDraft?.orderNumber) {
+      return orderDraft.orderNumber;
+    }
+    return stableFallbackRef.current || `ORD${Date.now().toString().slice(-6)}`;
+  }, [orderDraft?.orderNumber, isOpen]);
 
   // Standard universal UPI and app-specific intent URIs
-  const universalUpiUrl = `upi://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
-  const gpayUrl = `upi://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
-  const phonepeUrl = `phonepe://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
-  const paytmUrl = `paytmmp://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
+  const universalUpiUrl = useMemo(() => {
+    return `upi://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
+  }, [merchantUpi, merchantName, formattedAmount, orderRef]);
+
+  const gpayUrl = useMemo(() => {
+    return `upi://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
+  }, [merchantUpi, merchantName, formattedAmount, orderRef]);
+
+  const phonepeUrl = useMemo(() => {
+    return `phonepe://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
+  }, [merchantUpi, merchantName, formattedAmount, orderRef]);
+
+  const paytmUrl = useMemo(() => {
+    return `paytmmp://pay?pa=${encodeURIComponent(merchantUpi)}&pn=${encodeURIComponent(merchantName)}&am=${formattedAmount}&tr=${encodeURIComponent(orderRef)}&tn=${encodeURIComponent(`Notes Order ${orderRef}`)}&cu=INR`;
+  }, [merchantUpi, merchantName, formattedAmount, orderRef]);
 
   // Initialize or fetch secure order draft when opening modal
   useEffect(() => {
@@ -88,11 +118,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setStatusNotice('');
       setUtrNumber('');
     }
-  }, [isOpen, user, items, appliedCoupon, finalAmount]);
+  }, [isOpen]);
 
   // Generate dynamic QR Code for standard Google Pay / PhonePe / Paytm scanning
   useEffect(() => {
-    if (isOpen && finalAmount > 0) {
+    let isMounted = true;
+    if (isOpen && finalAmount > 0 && universalUpiUrl) {
       QRCode.toDataURL(universalUpiUrl, {
         width: 260,
         margin: 2,
@@ -101,9 +132,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           light: '#ffffff',
         },
       })
-        .then((url) => setQrDataUrl(url))
+        .then((url) => {
+          if (isMounted) {
+            setQrDataUrl(url);
+          }
+        })
         .catch((qrErr) => console.error('Failed to render QR Code:', qrErr));
     }
+    return () => {
+      isMounted = false;
+    };
   }, [isOpen, finalAmount, universalUpiUrl]);
 
   const initOrderDraft = async () => {
@@ -353,7 +391,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
       <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-6">
         {/* Header */}
         <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
