@@ -59,9 +59,9 @@ export async function getOrRenderPdfPages(pdfFilename: string): Promise<Rendered
       // Determine page count
       const detectedCount = await getPdfPageCount(pdfPath);
       
-      // Render pages using Ghostscript at 150 DPI for crystal clear text
+      // Render pages using Ghostscript at 300 DPI with subpixel anti-aliasing for retina-grade crispness
       const outputPattern = path.join(renderDir, 'page_%02d.png').replace(/\\/g, '/');
-      const renderCmd = `gs -dNOPAUSE -dBATCH -sDEVICE=png16m -r150 -sOutputFile="${outputPattern}" "${pdfPath.replace(/\\/g, '/')}"`;
+      const renderCmd = `gs -dNOPAUSE -dBATCH -sDEVICE=png16m -dTextAlphaBits=4 -dGraphicsAlphaBits=4 -dDOINTERPOLATE -r300 -sOutputFile="${outputPattern}" "${pdfPath.replace(/\\/g, '/')}"`;
       
       await execPromise(renderCmd);
 
