@@ -14,6 +14,8 @@ import {
   ChevronRight,
   TrendingUp,
   MessageCircle,
+  ShoppingCart,
+  User as UserIcon,
 } from 'lucide-react';
 import { Note, CartItem, User } from './types';
 import { api } from './services/api';
@@ -306,7 +308,7 @@ export function App() {
       />
 
       {/* Main Content Area Based on Current View */}
-      <main className="flex-1">
+      <main className="flex-1 pb-16 md:pb-0">
         {/* VIEW 1: HOME PAGE */}
         {currentView === 'home' && (
           <div className="space-y-16 pb-16">
@@ -564,15 +566,15 @@ export function App() {
               </div>
 
               {/* Sub-Filters: Subject & Resource Type */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200">
                 {/* Subject Pills */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Subject:</span>
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 sm:pb-0 scrollbar-none w-full sm:w-auto">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">Subject:</span>
                   {['All', 'Physics', 'Chemistry', 'Biology', 'Science', 'Mathematics', 'Social Science'].map((sub) => (
                     <button
                       key={sub}
                       onClick={() => setSelectedSubject(sub)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
                         selectedSubject === sub
                           ? 'bg-slate-900 text-white'
                           : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
@@ -584,11 +586,11 @@ export function App() {
                 </div>
 
                 {/* Resource Type & Exam dropdowns */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                   <select
                     value={selectedResourceType}
                     onChange={(e) => setSelectedResourceType(e.target.value)}
-                    className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none cursor-pointer"
+                    className="flex-1 sm:flex-none bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none cursor-pointer"
                   >
                     <option value="All">All Resource Types</option>
                     <option value="Notes">Comprehensive Notes</option>
@@ -602,7 +604,7 @@ export function App() {
                   <select
                     value={selectedExam}
                     onChange={(e) => setSelectedExam(e.target.value)}
-                    className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none cursor-pointer"
+                    className="flex-1 sm:flex-none bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-2.5 py-1.5 outline-none cursor-pointer"
                   >
                     <option value="All">All Exams</option>
                     <option value="NEET">NEET UG</option>
@@ -812,6 +814,93 @@ export function App() {
         initialMode={authMode}
         onAuthSuccess={handleAuthSuccess}
       />
+
+      {/* Mobile Bottom Quick Navigation Bar */}
+      <nav
+        id="mobile-bottom-nav"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 py-1.5 px-2 flex items-center justify-around shadow-lg"
+      >
+        <button
+          id="mobile-nav-notes"
+          onClick={() => handleNavigate('notes')}
+          className={`flex flex-col items-center justify-center p-1 rounded-xl transition-colors cursor-pointer min-w-[54px] ${
+            currentView === 'notes' && !freeOnly
+              ? 'text-teal-700 font-bold'
+              : 'text-slate-500 font-medium hover:text-slate-800'
+          }`}
+        >
+          <BookOpen className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">Notes</span>
+        </button>
+
+        <button
+          id="mobile-nav-free"
+          onClick={() => handleNavigate('free')}
+          className={`flex flex-col items-center justify-center p-1 rounded-xl transition-colors cursor-pointer min-w-[54px] ${
+            currentView === 'free' || (currentView === 'notes' && freeOnly)
+              ? 'text-teal-700 font-bold'
+              : 'text-slate-500 font-medium hover:text-slate-800'
+          }`}
+        >
+          <Download className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">Free</span>
+        </button>
+
+        <button
+          id="mobile-nav-saved"
+          onClick={() => {
+            if (currentUser) {
+              handleNavigate('dashboard', 'wishlist');
+            } else {
+              setAuthMode('login');
+              setIsAuthOpen(true);
+            }
+          }}
+          className="relative flex flex-col items-center justify-center p-1 rounded-xl text-slate-500 font-medium hover:text-slate-800 transition-colors cursor-pointer min-w-[54px]"
+        >
+          <Heart className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">Saved</span>
+          {wishlistIds.length > 0 && (
+            <span className="absolute top-0 right-2 w-4 h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-xs">
+              {wishlistIds.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          id="mobile-nav-cart"
+          onClick={() => setIsCartOpen(true)}
+          className="relative flex flex-col items-center justify-center p-1 rounded-xl text-slate-500 font-medium hover:text-slate-800 transition-colors cursor-pointer min-w-[54px]"
+        >
+          <ShoppingCart className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">Cart</span>
+          {cartItems.length > 0 && (
+            <span className="absolute top-0 right-2 w-4 h-4 bg-teal-600 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-xs">
+              {cartItems.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          id="mobile-nav-account"
+          onClick={() => {
+            if (currentUser) {
+              handleNavigate('dashboard', 'library');
+            } else {
+              setAuthMode('login');
+              setIsAuthOpen(true);
+            }
+          }}
+          className={`flex flex-col items-center justify-center p-1 rounded-xl transition-colors cursor-pointer min-w-[54px] ${
+            currentView === 'dashboard'
+              ? 'text-teal-700 font-bold'
+              : 'text-slate-500 font-medium hover:text-slate-800'
+          }`}
+        >
+          <UserIcon className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">{currentUser ? 'Library' : 'Sign In'}</span>
+        </button>
+      </nav>
     </div>
   );
 }

@@ -116,14 +116,15 @@ export const NoteCard: React.FC<NoteCardProps> = ({
                 e.stopPropagation();
                 onToggleWishlist(note.id);
               }}
-              className={`absolute bottom-2 right-2 p-1.5 rounded-full backdrop-blur-md transition-all cursor-pointer z-10 ${
+              className={`absolute bottom-2 right-2 p-2 sm:p-1.5 rounded-full backdrop-blur-md transition-all cursor-pointer z-10 ${
                 isWishlisted
                   ? 'bg-rose-500 text-white'
-                  : 'bg-black/30 hover:bg-black/50 text-white hover:text-rose-300'
+                  : 'bg-black/40 hover:bg-black/60 text-white hover:text-rose-300'
               }`}
               title="Add to Wishlist"
+              aria-label="Add to Wishlist"
             >
-              <Heart className={`w-3.5 h-3.5 ${isWishlisted ? 'fill-current' : ''}`} />
+              <Heart className={`w-4 h-4 sm:w-3.5 sm:h-3.5 ${isWishlisted ? 'fill-current' : ''}`} />
             </button>
           )}
         </div>
@@ -137,7 +138,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
         <p className="text-xs text-slate-500 mb-3 flex items-center justify-between font-medium">
           <span className="truncate max-w-[170px]">{note.chapter || 'Medical Notes'}</span>
           <span className="flex items-center gap-1 text-amber-500 font-bold text-xs shrink-0">
-            <Star className="w-3 h-3 fill-current" />
+            <Star className="w-3.5 h-3.5 sm:w-3 sm:h-3 fill-current" />
             {Number(note.rating_avg).toFixed(1)}
           </span>
         </p>
@@ -163,15 +164,16 @@ export const NoteCard: React.FC<NoteCardProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             id={`preview-btn-${note.id}`}
             onClick={(e) => {
               e.stopPropagation();
               onPreview(note);
             }}
-            className="p-1.5 rounded-lg text-slate-600 hover:text-teal-700 hover:bg-teal-50 transition-colors cursor-pointer"
+            className="p-2 sm:p-2 rounded-xl text-slate-600 hover:text-teal-700 hover:bg-teal-50 border border-slate-200/80 transition-colors cursor-pointer flex items-center justify-center min-w-[36px] min-h-[36px]"
             title="Preview Free Sample"
+            aria-label="Preview Note"
           >
             <Eye className="w-4 h-4" />
           </button>
@@ -183,9 +185,9 @@ export const NoteCard: React.FC<NoteCardProps> = ({
                 e.stopPropagation();
                 handleClick();
               }}
-              className="bg-teal-100 text-teal-800 text-[10px] uppercase font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer"
+              className="bg-teal-100 hover:bg-teal-200 text-teal-900 text-xs font-bold px-3.5 py-2 sm:py-1.5 rounded-xl flex items-center gap-1.5 cursor-pointer min-h-[36px] transition-colors"
             >
-              <Check className="w-3 h-3" />
+              <Check className="w-3.5 h-3.5 text-teal-700" />
               <span>Owned</span>
             </button>
           ) : note.is_free ? (
@@ -195,9 +197,9 @@ export const NoteCard: React.FC<NoteCardProps> = ({
                 e.stopPropagation();
                 onAddToCart(note);
               }}
-              className="bg-teal-600 hover:bg-teal-700 text-white text-[10px] uppercase font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+              className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3.5 py-2 sm:py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 min-h-[36px] shadow-sm shadow-teal-600/20"
             >
-              <Download className="w-3 h-3" />
+              <Download className="w-3.5 h-3.5" />
               <span>Download</span>
             </button>
           ) : (
@@ -207,15 +209,15 @@ export const NoteCard: React.FC<NoteCardProps> = ({
                 e.stopPropagation();
                 onAddToCart(note);
               }}
-              className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
+              className={`text-xs font-bold px-3.5 py-2 sm:py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 min-h-[36px] ${
                 isInCart
                   ? 'bg-teal-700 text-white'
-                  : 'bg-slate-900 hover:bg-slate-800 text-white'
+                  : 'bg-slate-900 hover:bg-slate-800 text-white shadow-sm'
               }`}
             >
               {isInCart ? (
                 <>
-                  <Check className="w-3 h-3 text-teal-300" />
+                  <Check className="w-3.5 h-3.5 text-teal-300" />
                   <span>In Cart</span>
                 </>
               ) : (

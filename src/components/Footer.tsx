@@ -139,7 +139,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenAdminLogin }) 
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold text-slate-400">
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold text-slate-400 text-center sm:text-left">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <span className="text-sm font-black tracking-tighter text-teal-400">NEET<span className="text-white">NOTES</span></span>
             <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest sm:ml-2">
@@ -147,14 +147,14 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenAdminLogin }) 
             </span>
           </div>
 
-          <div className="flex items-center gap-6 text-xs uppercase tracking-widest text-slate-400">
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs uppercase tracking-widest text-slate-400">
             <button onClick={() => onNavigate('about')} className="hover:text-white transition-colors cursor-pointer">About</button>
             <button onClick={() => onNavigate('terms')} className="hover:text-white transition-colors cursor-pointer">Privacy</button>
             <button onClick={() => onNavigate('contact')} className="hover:text-white transition-colors cursor-pointer">Support</button>
             <button onClick={() => onNavigate('terms')} className="hover:text-white transition-colors cursor-pointer">Refunds</button>
           </div>
 
-          <div className="flex flex-col items-end">
+          <div className="flex flex-col items-center sm:items-end">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
               <span className="text-[10px] font-bold text-slate-300">Server Status: Online</span>

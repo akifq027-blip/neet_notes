@@ -278,18 +278,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   id="navbar-login-btn"
                   onClick={() => onOpenAuth('login')}
-                  className="text-xs sm:text-sm font-bold text-slate-700 hover:text-teal-600 px-3.5 py-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                  className="text-xs sm:text-sm font-bold text-slate-700 hover:text-teal-600 px-2.5 sm:px-3.5 py-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   Log In
                 </button>
                 <button
                   id="navbar-register-btn"
                   onClick={() => onOpenAuth('register')}
-                  className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-black uppercase tracking-wider px-4 py-2 rounded-lg shadow-sm transition-all cursor-pointer"
+                  className="hidden xs:inline-block bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-black uppercase tracking-wider px-3 sm:px-4 py-2 rounded-lg shadow-sm transition-all cursor-pointer"
                 >
                   Sign Up
                 </button>
@@ -300,7 +300,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               id="mobile-menu-toggle-btn"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              className="md:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+              aria-label="Toggle Menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -309,7 +310,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Mobile Search Bar & Menu Drawer */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 py-4 space-y-3 animate-in fade-in duration-150">
+          <div className="md:hidden border-t border-slate-200 py-4 space-y-3.5 animate-in fade-in duration-150 max-h-[80vh] overflow-y-auto">
+            {/* Mobile Search Input */}
             <div className="relative px-2">
               <input
                 id="mobile-search-input"
@@ -318,7 +320,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onChange={(e) => onSearchChange(e.target.value)}
                 onKeyDown={handleSearchKeyPress}
                 placeholder="Search notes, chapters, NCERT..."
-                className="w-full bg-slate-100 text-slate-800 text-sm pl-9 pr-16 py-2.5 rounded-full border border-slate-200 outline-none font-medium"
+                className="w-full bg-slate-100 text-slate-800 text-sm pl-9 pr-16 py-2.5 rounded-full border border-slate-200 focus:border-teal-500 focus:bg-white outline-none font-medium"
               />
               <Search className="w-4 h-4 text-slate-400 absolute left-5 top-1/2 -translate-y-1/2" />
               <button
@@ -326,39 +328,80 @@ export const Navbar: React.FC<NavbarProps> = ({
                   onSearchSubmit();
                   setMobileMenuOpen(false);
                 }}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 bg-teal-600 text-white text-xs font-bold px-3 py-1 rounded-full"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3.5 py-1 rounded-full cursor-pointer transition-colors"
               >
                 Go
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 px-2 pt-2">
+            {/* If logged in, prominent student library link */}
+            {user ? (
+              <div className="mx-2 p-3 bg-teal-50 border border-teal-200/80 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-teal-600 text-white font-bold flex items-center justify-center text-sm">
+                    {user.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">{user.name}</p>
+                    <p className="text-[11px] text-teal-700 font-medium">Active Student</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    onNavigate('library');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
+                >
+                  My Library
+                </button>
+              </div>
+            ) : (
+              <div className="mx-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-slate-900">Student Account</p>
+                  <p className="text-[11px] text-slate-500">Sign in to save notes & downloads</p>
+                </div>
+                <button
+                  onClick={() => {
+                    onOpenAuth('register');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="bg-slate-900 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg cursor-pointer"
+                >
+                  Register Free
+                </button>
+              </div>
+            )}
+
+            {/* Quick Filter Navigation Grid */}
+            <div className="grid grid-cols-2 gap-2 px-2">
               <button
                 onClick={() => {
                   onNavigate('notes');
                   setMobileMenuOpen(false);
                 }}
-                className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-100 text-slate-800 text-xs font-bold"
+                className="flex items-center gap-2 p-3 rounded-xl bg-slate-100 text-slate-800 text-xs font-bold hover:bg-slate-200 transition-colors"
               >
                 <BookOpen className="w-4 h-4 text-teal-600" />
-                All Notes
+                <span>All Notes Catalog</span>
               </button>
               <button
                 onClick={() => {
                   onNavigate('notes', { is_free: '1' });
                   setMobileMenuOpen(false);
                 }}
-                className="flex items-center gap-2 p-2.5 rounded-xl bg-teal-100 text-teal-800 text-xs font-bold"
+                className="flex items-center gap-2 p-3 rounded-xl bg-teal-100 text-teal-900 text-xs font-bold hover:bg-teal-200 transition-colors"
               >
-                <Download className="w-4 h-4 text-teal-600" />
-                Free Notes
+                <Download className="w-4 h-4 text-teal-700" />
+                <span>Free Study Notes</span>
               </button>
               <button
                 onClick={() => {
                   onNavigate('notes', { subject: 'Physics' });
                   setMobileMenuOpen(false);
                 }}
-                className="p-2.5 rounded-xl bg-blue-50 text-blue-800 text-xs font-bold text-left"
+                className="p-3 rounded-xl bg-blue-50 text-blue-900 text-xs font-bold text-left hover:bg-blue-100 transition-colors"
               >
                 ⚡ Physics Notes
               </button>
@@ -367,7 +410,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   onNavigate('notes', { subject: 'Chemistry' });
                   setMobileMenuOpen(false);
                 }}
-                className="p-2.5 rounded-xl bg-amber-50 text-amber-800 text-xs font-bold text-left"
+                className="p-3 rounded-xl bg-amber-50 text-amber-900 text-xs font-bold text-left hover:bg-amber-100 transition-colors"
               >
                 🧪 Chemistry Notes
               </button>
@@ -376,16 +419,48 @@ export const Navbar: React.FC<NavbarProps> = ({
                   onNavigate('notes', { subject: 'Biology' });
                   setMobileMenuOpen(false);
                 }}
-                className="p-2.5 rounded-xl bg-teal-50 text-teal-800 text-xs font-bold text-left col-span-2"
+                className="p-3 rounded-xl bg-teal-50 text-teal-900 text-xs font-bold text-left col-span-2 hover:bg-teal-100 transition-colors flex items-center justify-between"
               >
-                🌿 Biology NCERT Master Modules
+                <span>🌿 Biology NCERT Modules</span>
+                <span className="text-[10px] uppercase font-mono font-bold bg-teal-200/80 text-teal-950 px-2 py-0.5 rounded">High Yield</span>
               </button>
             </div>
 
-            <div className="border-t border-slate-100 pt-2 px-2 flex justify-around text-xs text-slate-600 font-bold uppercase tracking-wider">
-              <button onClick={() => { onNavigate('about'); setMobileMenuOpen(false); }}>About Us</button>
-              <button onClick={() => { onNavigate('faq'); setMobileMenuOpen(false); }}>FAQ</button>
-              <button onClick={() => { onNavigate('contact'); setMobileMenuOpen(false); }}>Support</button>
+            {/* Target Classes Horizontal Scroll */}
+            <div className="px-2 pt-1">
+              <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Quick Jump by Class:</p>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                {['Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12', 'NEET UG'].map((cls) => (
+                  <button
+                    key={cls}
+                    onClick={() => {
+                      onNavigate('notes', { class_level: cls });
+                      setMobileMenuOpen(false);
+                    }}
+                    className="shrink-0 text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                  >
+                    {cls}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer Auxiliary Links */}
+            <div className="border-t border-slate-100 pt-3 px-2 flex justify-around text-xs text-slate-600 font-bold uppercase tracking-wider">
+              <button onClick={() => { onNavigate('about'); setMobileMenuOpen(false); }} className="py-1">About Us</button>
+              <button onClick={() => { onNavigate('faq'); setMobileMenuOpen(false); }} className="py-1">FAQ</button>
+              <button onClick={() => { onNavigate('contact'); setMobileMenuOpen(false); }} className="py-1">Support</button>
+              {user && (
+                <button
+                  onClick={() => {
+                    onLogout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-rose-600 py-1"
+                >
+                  Sign Out
+                </button>
+              )}
             </div>
           </div>
         )}
