@@ -722,7 +722,7 @@ export const api = {
     utr: string;
     appName?: string;
     items?: number[];
-  }): Promise<{ success: boolean; message: string; orderId?: number; maskedReference?: string }> {
+  }): Promise<{ success: boolean; status?: string; message: string; orderId?: number; maskedReference?: string }> {
     const result = await safeFetch(`${API_BASE}/payment/verify-upi`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -735,10 +735,10 @@ export const api = {
       return result;
     }
 
-    // Grant access locally
+    // Local fallback when offline
     const currentOrders = getLocalOrders();
     const cleanUtr = String(data.utr || '').trim();
-    const maskedRef = cleanUtr.length > 4 ? `****${cleanUtr.slice(-4)}` : '****';
+    const maskedRef = cleanUtr.length > 4 ? `****${cleanUtr.slice(-4)}` : cleanUtr;
     const orderNum = `ORD-UPI-${Date.now().toString().slice(-6)}`;
     const noteIds = data.items && data.items.length > 0 ? data.items : [1];
     const catalog = getFallbackNotes();
@@ -751,9 +751,9 @@ export const api = {
       subtotal: purchasedNotes.reduce((sum, n) => sum + (n.is_free ? 0 : Number(n.price)), 0) || 199.0,
       discount_amount: 0,
       total_amount: purchasedNotes.reduce((sum, n) => sum + (n.is_free ? 0 : Number(n.price)), 0) || 199.0,
-      payment_status: 'paid',
-      payment_method: `UPI (${data.appName || 'Instant GPay/PhonePe'})`,
-      razorpay_payment_id: `UPI-${cleanUtr || 'VERIFIED'}`,
+      payment_status: 'pending_verification',
+      payment_method: `UPI (${data.appName || 'UPI Manual'})`,
+      razorpay_payment_id: `UPI-${cleanUtr || 'PENDING'}`,
       created_at: new Date().toISOString(),
       items: (purchasedNotes.length > 0 ? purchasedNotes : [catalog[0]]).map(n => ({
         id: Date.now() + n.id,
@@ -769,17 +769,14 @@ export const api = {
     currentOrders.unshift(newOrder);
     saveLocalOrders(currentOrders);
 
-    const ids = getLocalLibraryIds();
-    noteIds.forEach(id => {
-      if (!ids.includes(id)) ids.push(id);
-    });
-    saveLocalLibraryIds(ids);
+    // Note: Do not unlock notes into localLibraryIds until approved by admin!
 
     window.dispatchEvent(new CustomEvent('neet_notes_updated'));
 
     return {
       success: true,
-      message: 'UPI payment verified successfully! Access granted to your notes.',
+      status: 'pending_verification',
+      message: 'Payment Submitted for Verification — Our team will verify your UTR and unlock your notes within 15–30 minutes.',
       orderId: newOrder.id,
       maskedReference: maskedRef,
     };
@@ -1136,11 +1133,31 @@ export const api = {
   },
 
   async updateOrderStatus(id: number, status: string): Promise<any> {
-    return safeFetch(`${API_BASE}/admin/orders/${id}/status`, {
+    const res = await safeFetch(`${API_BASE}/admin/orders/${id}/status`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({ payment_status: status }),
     });
+
+    // Synchronize local fallback store if exists
+    const localOrders = getLocalOrders();
+    const targetOrder = localOrders.find(o => o.id === id);
+    if (targetOrder) {
+      targetOrder.payment_status = status as any;
+      saveLocalOrders(localOrders);
+
+      // If approved as paid, unlock the notes for student library
+      if (status === 'paid') {
+        const ids = getLocalLibraryIds();
+        targetOrder.items?.forEach(it => {
+          if (!ids.includes(it.note_id)) ids.push(it.note_id);
+        });
+        saveLocalLibraryIds(ids);
+      }
+      window.dispatchEvent(new CustomEvent('neet_notes_updated'));
+    }
+
+    return res;
   },
 
   async getAdminUsers(): Promise<{ success: boolean; users: any[] }> {

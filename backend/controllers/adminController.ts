@@ -590,17 +590,52 @@ export async function updateOrderStatus(req: Request, res: Response) {
     if (isMySQLConnected()) {
       const pool = getPool();
       if (pool) {
-        await pool.query('UPDATE orders SET payment_status = ? WHERE id = ?', [payment_status, orderId]);
-        return res.json({ success: true, message: 'Order status updated successfully.' });
+        const [prevRows]: any = await pool.query('SELECT payment_status, coupon_code FROM orders WHERE id = ?', [orderId]);
+        const wasPaid = prevRows[0]?.payment_status === 'paid';
+
+        await pool.query('UPDATE orders SET payment_status = ?, updated_at = NOW() WHERE id = ?', [payment_status, orderId]);
+
+        // If newly transitioned to paid, increment note purchase counts and coupon usage
+        if (!wasPaid && payment_status === 'paid') {
+          const [items]: any = await pool.query('SELECT note_id FROM order_items WHERE order_id = ?', [orderId]);
+          for (const item of items) {
+            await pool.query('UPDATE notes SET purchase_count = purchase_count + 1 WHERE id = ?', [item.note_id]);
+          }
+          if (prevRows[0]?.coupon_code) {
+            await pool.query('UPDATE coupons SET times_used = times_used + 1 WHERE code = ?', [prevRows[0].coupon_code]);
+          }
+        }
+
+        return res.json({
+          success: true,
+          message: payment_status === 'paid' ? 'Payment approved and notes unlocked for student!' : `Order status updated to ${payment_status}.`,
+        });
       }
     }
 
     const order = memoryStore.orders.find(o => o.id === orderId);
     if (order) {
+      const wasPaid = order.payment_status === 'paid';
       order.payment_status = payment_status;
+
+      if (!wasPaid && payment_status === 'paid') {
+        const items = memoryStore.order_items.filter(oi => oi.order_id === order.id);
+        items.forEach(item => {
+          const note = memoryStore.notes.find(n => n.id === item.note_id);
+          if (note) note.purchase_count = (note.purchase_count || 0) + 1;
+        });
+
+        if (order.coupon_code) {
+          const cp = memoryStore.coupons.find(c => c.code === order.coupon_code);
+          if (cp) cp.times_used = (cp.times_used || 0) + 1;
+        }
+      }
     }
 
-    return res.json({ success: true, message: 'Order status updated.' });
+    return res.json({
+      success: true,
+      message: payment_status === 'paid' ? 'Payment approved and notes unlocked for student!' : `Order status updated to ${payment_status}.`,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to update order' });
   }

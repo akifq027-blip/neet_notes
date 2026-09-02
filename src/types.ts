@@ -84,7 +84,7 @@ export interface Order {
   discount_amount: number;
   coupon_code?: string | null;
   total_amount: number;
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+  payment_status: 'pending' | 'pending_verification' | 'paid' | 'failed' | 'refunded' | 'rejected';
   payment_method: string;
   razorpay_order_id?: string | null;
   razorpay_payment_id?: string | null;

@@ -17,6 +17,7 @@ import {
   RefreshCw,
   BookOpen,
   Download,
+  Clock,
 } from 'lucide-react';
 import { CartItem, User } from '../types';
 import { api } from '../services/api';
@@ -256,17 +257,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
-  const handleUseSampleUtr = () => {
-    const sample = `43${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-    setUtrNumber(sample);
-    setErrorMessage('');
-    setStatusNotice('Test 12-digit UTR loaded! Click "Verify & Unlock" below.');
-  };
-
-  const handleConfirmUpiPayment = async (customUtr?: string, e?: React.MouseEvent | React.FormEvent) => {
+  const handleConfirmUpiPayment = async (e?: React.MouseEvent | React.FormEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
+    }
+
+    const cleanUtr = utrNumber.trim().replace(/[^0-9]/g, '');
+    if (!cleanUtr || cleanUtr.length !== 12) {
+      setErrorMessage('Please enter the complete 12-digit UPI Reference / UTR Number from your payment receipt before submitting.');
+      return;
     }
 
     setIsVerifyingUpi(true);
@@ -298,13 +298,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           ? 'PhonePe'
           : selectedApp === 'paytm'
           ? 'Paytm'
-          : 'UPI Direct';
-
-      const candidateUtr = (customUtr || utrNumber).trim();
-      const cleanUtr =
-        candidateUtr.length >= 6
-          ? candidateUtr
-          : `98${Date.now().toString().slice(-6)}${Math.floor(1000 + Math.random() * 9000)}`;
+          : 'UPI Manual';
 
       const res = await api.verifyUpiPayment({
         orderId: draft?.orderId || Date.now(),
@@ -317,13 +311,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setCompletedOrder({
           orderId: res.orderId || draft?.orderId || Date.now(),
           orderNumber: draft?.orderNumber || `ORD-UPI-${Date.now().toString().slice(-6)}`,
-          paymentId: `UPI-${cleanUtr.slice(-4)}`,
+          paymentId: `UPI-${cleanUtr}`,
           maskedReference: res.maskedReference || `****${cleanUtr.slice(-4)}`,
           paymentMethod: appLabel,
+          status: 'pending_verification',
+          utr: cleanUtr,
           purchasedNotes: items.map((i) => i.note),
         });
       } else {
-        setErrorMessage(res?.message || 'Payment verification failed. Please check the UTR reference.');
+        setErrorMessage(res?.message || 'Payment submission failed. Please check the 12-digit UTR reference.');
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Verification error. Please retry.');
@@ -373,79 +369,168 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {/* Modal Body */}
         <div className="p-5 sm:p-6 space-y-5">
           {completedOrder ? (
-            <div className="text-center py-3 space-y-4">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto animate-bounce shadow-md shadow-emerald-500/20">
-                <CheckCircle2 className="w-10 h-10" />
-              </div>
-              <div>
-                <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                  Payment Verified & Completed
-                </span>
-                <h3 className="text-xl font-black text-slate-900 mt-2">
-                  Study Notes Unlocked Successfully!
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Order Number: <strong className="text-slate-800">{completedOrder.orderNumber}</strong>
-                </p>
-                {completedOrder.maskedReference && (
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    UPI Reference (UTR): <strong className="text-emerald-700">{completedOrder.maskedReference}</strong>
-                  </p>
-                )}
-                {completedOrder.paymentMethod && (
-                  <p className="text-[11px] text-slate-400">Payment App: {completedOrder.paymentMethod}</p>
-                )}
-              </div>
-
-              {/* Instant Download Section */}
-              <div className="space-y-2 text-left bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
-                    <Download className="w-4 h-4 text-emerald-600" />
-                    <span>Download Purchased Notes:</span>
-                  </span>
-                  <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full">
-                    Ready Now
-                  </span>
+            completedOrder.status === 'pending_verification' ? (
+              <div className="text-center py-3 space-y-4">
+                <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto shadow-md shadow-amber-500/20">
+                  <Clock className="w-9 h-9 animate-pulse" />
                 </div>
-                <div className="space-y-2 pt-1 max-h-48 overflow-y-auto">
-                  {(completedOrder.purchasedNotes || items.map((i) => i.note)).map((note: any) => (
-                    <div
-                      key={note.id}
-                      className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-between gap-3"
-                    >
-                      <div className="truncate min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">{note.title}</p>
-                        <p className="text-[10px] text-slate-500">{note.subject} • {note.chapter}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadNote(note.id)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs transition-all"
+                <div>
+                  <span className="bg-amber-100 text-amber-800 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Verification Pending</span>
+                  </span>
+                  <h3 className="text-xl font-black text-slate-900 mt-2">
+                    Payment Submitted for Verification
+                  </h3>
+                  <div className="mt-2.5 p-3.5 bg-amber-50/80 border border-amber-200 rounded-2xl text-xs text-amber-900 font-semibold leading-relaxed">
+                    Our team will verify your UTR and unlock your notes within 15–30 minutes.
+                  </div>
+                </div>
+
+                {/* Verification Summary Card */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-2.5 text-left">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                    <span className="text-slate-500 font-medium">Order Number:</span>
+                    <span className="font-mono font-bold text-slate-900">{completedOrder.orderNumber}</span>
+                  </div>
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                    <span className="text-slate-500 font-medium">Submitted 12-Digit UTR:</span>
+                    <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+                      {completedOrder.maskedReference || completedOrder.utr}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                    <span className="text-slate-500 font-medium">Payment Amount:</span>
+                    <span className="font-bold text-slate-900">₹{finalAmount}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">Order Status:</span>
+                    <span className="font-extrabold text-amber-700 uppercase text-[11px] bg-amber-100/80 px-2 py-0.5 rounded-full">
+                      Pending Admin Approval
+                    </span>
+                  </div>
+                </div>
+
+                {/* Ordered Notes (locked until verified) */}
+                <div className="space-y-2 text-left bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                      <BookOpen className="w-4 h-4 text-slate-600" />
+                      <span>Study Notes in this Order:</span>
+                    </span>
+                    <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-2 py-0.5 rounded-full">
+                      Unlocks Upon Approval
+                    </span>
+                  </div>
+                  <div className="space-y-2 pt-1 max-h-40 overflow-y-auto">
+                    {(completedOrder.purchasedNotes || items.map((i) => i.note)).map((note: any) => (
+                      <div
+                        key={note.id}
+                        className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-between gap-3"
                       >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download PDF</span>
-                      </button>
-                    </div>
-                  ))}
+                        <div className="truncate min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">{note.title}</p>
+                          <p className="text-[10px] text-slate-500">{note.subject} • {note.chapter}</p>
+                        </div>
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg shrink-0 flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-amber-600" />
+                          <span>Verifying UTR</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Go to Orders & Receipts Button */}
+                <button
+                  id="checkout-success-orders-btn"
+                  type="button"
+                  onClick={handleFinishAndOpenOrders}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all text-sm cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span>Track in My Orders & Receipts</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+
+                <p className="text-[11px] text-slate-400">
+                  Auto-redirecting to your Orders in <span className="font-bold text-amber-600">{redirectCountdown}s</span>...
+                </p>
               </div>
+            ) : (
+              <div className="text-center py-3 space-y-4">
+                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto animate-bounce shadow-md shadow-emerald-500/20">
+                  <CheckCircle2 className="w-10 h-10" />
+                </div>
+                <div>
+                  <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
+                    Payment Verified & Completed
+                  </span>
+                  <h3 className="text-xl font-black text-slate-900 mt-2">
+                    Study Notes Unlocked Successfully!
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Order Number: <strong className="text-slate-800">{completedOrder.orderNumber}</strong>
+                  </p>
+                  {completedOrder.maskedReference && (
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      UPI Reference (UTR): <strong className="text-emerald-700">{completedOrder.maskedReference}</strong>
+                    </p>
+                  )}
+                  {completedOrder.paymentMethod && (
+                    <p className="text-[11px] text-slate-400">Payment App: {completedOrder.paymentMethod}</p>
+                  )}
+                </div>
 
-              {/* Go to Orders & Receipts Button */}
-              <button
-                id="checkout-success-orders-btn"
-                type="button"
-                onClick={handleFinishAndOpenOrders}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all text-sm cursor-pointer flex items-center justify-center gap-2"
-              >
-                <span>Go to My Orders & Receipts</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+                {/* Instant Download Section */}
+                <div className="space-y-2 text-left bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                      <Download className="w-4 h-4 text-emerald-600" />
+                      <span>Download Purchased Notes:</span>
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full">
+                      Ready Now
+                    </span>
+                  </div>
+                  <div className="space-y-2 pt-1 max-h-48 overflow-y-auto">
+                    {(completedOrder.purchasedNotes || items.map((i) => i.note)).map((note: any) => (
+                      <div
+                        key={note.id}
+                        className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-between gap-3"
+                      >
+                        <div className="truncate min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">{note.title}</p>
+                          <p className="text-[10px] text-slate-500">{note.subject} • {note.chapter}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadNote(note.id)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs transition-all"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download PDF</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-              <p className="text-[11px] text-slate-400">
-                Auto-redirecting to your Orders in <span className="font-bold text-emerald-600">{redirectCountdown}s</span>...
-              </p>
-            </div>
+                {/* Go to Orders & Receipts Button */}
+                <button
+                  id="checkout-success-orders-btn"
+                  type="button"
+                  onClick={handleFinishAndOpenOrders}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all text-sm cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span>Go to My Orders & Receipts</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+
+                <p className="text-[11px] text-slate-400">
+                  Auto-redirecting to your Orders in <span className="font-bold text-emerald-600">{redirectCountdown}s</span>...
+                </p>
+              </div>
+            )
           ) : !user ? (
             <div className="text-center py-6 space-y-4">
               <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto">
@@ -678,58 +763,84 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         </div>
                       </div>
                     )}
-                    {/* Primary Confirmation Button */}
-                    <div className="pt-2">
+                  </div>
+
+                  {/* STEP 2: Mandatory UTR Reference */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">
+                          2
+                        </span>
+                        <span>Enter 12-Digit UPI Reference / UTR Number</span>
+                      </span>
+                      <span className="text-[10px] text-rose-700 bg-rose-50 border border-rose-200 font-bold px-2 py-0.5 rounded-full uppercase">
+                        Mandatory
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      After sending ₹{finalAmount}, open your UPI app receipt (Google Pay, PhonePe, or Paytm) and copy the <strong>12-digit UPI Reference / UTR Number</strong>.
+                    </p>
+
+                    <div className="space-y-1.5">
+                      <div className="relative flex items-center">
+                        <input
+                          id="upi-utr-input"
+                          type="text"
+                          inputMode="numeric"
+                          value={utrNumber}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 12);
+                            setUtrNumber(val);
+                            if (errorMessage) setErrorMessage('');
+                          }}
+                          placeholder="e.g. 429381928374 (12 digits)"
+                          maxLength={12}
+                          className="w-full text-sm px-3.5 py-3 pr-24 bg-white rounded-xl border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none font-mono font-bold text-slate-900 placeholder:text-slate-400 tracking-wider"
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[11px] font-mono font-bold">
+                          <span className={utrNumber.length === 12 ? 'text-emerald-600' : 'text-slate-400'}>
+                            {utrNumber.length}/12
+                          </span>
+                          {utrNumber.length === 12 && (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] text-slate-400 px-1">
+                        <span>Must be exactly 12 numeric digits</span>
+                        <span>UPI Transaction ID / Ref No.</span>
+                      </div>
+                    </div>
+
+                    {/* Primary Submit Payment for Verification Button */}
+                    <div className="pt-1">
                       <button
-                        id="confirm-upi-payment-btn"
+                        id="submit-payment-verification-btn"
                         type="button"
-                        disabled={isVerifyingUpi}
-                        onClick={(e) => handleConfirmUpiPayment(undefined, e)}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
+                        disabled={isVerifyingUpi || utrNumber.trim().length !== 12}
+                        onClick={(e) => handleConfirmUpiPayment(e)}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
                       >
                         {isVerifyingUpi ? (
                           <>
                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            <span>Confirming Payment & Unlocking Notes...</span>
+                            <span>Submitting for Verification...</span>
                           </>
                         ) : (
                           <>
-                            <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                            <span>I Have Paid via UPI / Confirm & Download Notes</span>
+                            <ShieldCheck className="w-4 h-4" />
+                            <span>Submit Payment for Verification</span>
                           </>
                         )}
                       </button>
-                    </div>
-                  </div>
 
-                  {/* STEP 2: Optional UTR Reference */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-700 flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px] font-black">
-                          2
-                        </span>
-                        <span>Or Enter 12-Digit UTR / Ref No. (Optional)</span>
-                      </span>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={utrNumber}
-                        onChange={(e) => setUtrNumber(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
-                        placeholder="e.g. 429381928374"
-                        maxLength={18}
-                        className="flex-1 text-xs px-3.5 py-2.5 bg-white rounded-xl border border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none font-mono font-bold text-slate-800"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleConfirmUpiPayment(utrNumber)}
-                        disabled={isVerifyingUpi}
-                        className="bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer shrink-0 shadow-xs"
-                      >
-                        {isVerifyingUpi ? 'Verifying...' : 'Verify UTR'}
-                      </button>
+                      {utrNumber.trim().length !== 12 && (
+                        <p className="text-[11px] text-slate-500 text-center mt-2">
+                          Please enter the 12-digit UTR from your payment receipt to enable submission.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

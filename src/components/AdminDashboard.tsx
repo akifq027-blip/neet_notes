@@ -22,6 +22,7 @@ import {
   Settings,
   Save,
   Check,
+  Clock,
 } from 'lucide-react';
 import { Note, Order, User, Review, Coupon, ContactMessage, RefundRequest, DashboardStats } from '../types';
 import { api } from '../services/api';
@@ -293,8 +294,14 @@ export const AdminDashboard: React.FC = () => {
       prev.map((o) => (o.id === orderId ? { ...o, payment_status: status as any } : o))
     );
     try {
-      const res = await api.updateOrderStatus(orderId, status);
-      showToast(`Order marked as ${status.toUpperCase()}`);
+      await api.updateOrderStatus(orderId, status);
+      if (status === 'paid') {
+        showToast('Payment Approved! Notes unlocked for the student.');
+      } else if (status === 'rejected') {
+        showToast('Payment Rejected. Order marked as rejected.');
+      } else {
+        showToast(`Order marked as ${status.replace('_', ' ').toUpperCase()}`);
+      }
       loadTabContent();
     } catch (err) {
       showToast('Error updating order');
@@ -600,8 +607,16 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-slate-900">₹{ord.total_amount}</div>
-                      <span className="text-[10px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-                        {ord.payment_status}
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                        ord.payment_status === 'paid'
+                          ? 'text-emerald-700 bg-emerald-50'
+                          : ord.payment_status === 'pending_verification'
+                          ? 'text-amber-700 bg-amber-50'
+                          : ord.payment_status === 'rejected'
+                          ? 'text-rose-700 bg-rose-50'
+                          : 'text-slate-700 bg-slate-100'
+                      }`}>
+                        {ord.payment_status?.replace('_', ' ')}
                       </span>
                     </div>
                   </div>
@@ -1075,10 +1090,35 @@ export const AdminDashboard: React.FC = () => {
       {/* Tab 3: Orders Management */}
       {activeTab === 'orders' && (
         <div className="space-y-6">
+          {/* Pending Verification Notice Banner */}
+          {orders.filter((o) => o.payment_status === 'pending_verification' || o.payment_status === 'pending').length > 0 && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 text-amber-700 rounded-xl flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-amber-900 uppercase tracking-wide">
+                    {orders.filter((o) => o.payment_status === 'pending_verification' || o.payment_status === 'pending').length} UPI Payments Awaiting Verification
+                  </h4>
+                  <p className="text-[11px] text-amber-700">
+                    Verify the student&apos;s 12-digit UTR in your UPI app/bank and click &quot;Approve&quot; to unlock their study notes.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setOrderStatusFilter('pending_verification')}
+                className="text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-xl transition-all cursor-pointer shrink-0 shadow-xs"
+              >
+                Show Pending ({orders.filter((o) => o.payment_status === 'pending_verification' || o.payment_status === 'pending').length})
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-black text-slate-900">Orders & Invoices</h2>
-              <p className="text-xs text-slate-500">Real-time status of student transactions.</p>
+              <p className="text-xs text-slate-500">Real-time status of student transactions and manual UPI verifications.</p>
             </div>
 
             <div className="flex items-center gap-2 text-xs">
@@ -1089,7 +1129,9 @@ export const AdminDashboard: React.FC = () => {
                 className="p-2 border border-slate-200 rounded-xl bg-white font-medium"
               >
                 <option value="all">All Statuses</option>
+                <option value="pending_verification">Pending Verification</option>
                 <option value="paid">Paid</option>
+                <option value="rejected">Rejected</option>
                 <option value="pending">Pending</option>
                 <option value="refunded">Refunded</option>
               </select>
@@ -1102,11 +1144,12 @@ export const AdminDashboard: React.FC = () => {
                 <tr>
                   <th className="p-4">Order ID</th>
                   <th className="p-4">Customer</th>
+                  <th className="p-4">Notes Ordered</th>
                   <th className="p-4">Amount</th>
-                  <th className="p-4">Payment Method</th>
+                  <th className="p-4">Payment & UTR</th>
                   <th className="p-4">Status</th>
                   <th className="p-4">Date</th>
-                  <th className="p-4 text-right">Update Status</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -1117,35 +1160,94 @@ export const AdminDashboard: React.FC = () => {
                       <div className="font-bold text-slate-900">{ord.customer_name}</div>
                       <div className="text-[11px] text-slate-400">{ord.customer_email}</div>
                     </td>
+                    <td className="p-4 max-w-xs">
+                      {ord.items && ord.items.length > 0 ? (
+                        <div className="space-y-0.5">
+                          {ord.items.map((it: any, idx: number) => (
+                            <div key={idx} className="text-[11px] font-semibold text-slate-800 truncate">
+                              • {it.note_title || `Note #${it.note_id}`}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic text-[11px]">No items listed</span>
+                      )}
+                    </td>
                     <td className="p-4 font-bold text-slate-900">₹{ord.total_amount}</td>
-                    <td className="p-4 uppercase text-[11px]">{ord.payment_method}</td>
+                    <td className="p-4">
+                      <div className="uppercase text-[11px] font-bold text-slate-800">{ord.payment_method}</div>
+                      {ord.razorpay_payment_id && (
+                        <div className="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center gap-1">
+                          <span>UTR:</span>
+                          <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                            {ord.razorpay_payment_id.replace(/^UPI-/, '')}
+                          </span>
+                        </div>
+                      )}
+                    </td>
                     <td className="p-4">
                       <span
-                        className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                        className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full inline-flex items-center gap-1 ${
                           ord.payment_status === 'paid'
                             ? 'bg-emerald-100 text-emerald-800'
+                            : ord.payment_status === 'pending_verification'
+                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                            : ord.payment_status === 'rejected'
+                            ? 'bg-rose-100 text-rose-800 border border-rose-300'
                             : ord.payment_status === 'refunded'
                             ? 'bg-purple-100 text-purple-800'
-                            : 'bg-amber-100 text-amber-800'
+                            : 'bg-slate-100 text-slate-700'
                         }`}
                       >
-                        {ord.payment_status}
+                        {ord.payment_status === 'pending_verification' && <Clock className="w-3 h-3" />}
+                        {ord.payment_status === 'paid' && <CheckCircle2 className="w-3 h-3" />}
+                        {ord.payment_status === 'rejected' && <XCircle className="w-3 h-3" />}
+                        <span>{ord.payment_status?.replace('_', ' ')}</span>
                       </span>
                     </td>
-                    <td className="p-4 text-slate-400">
+                    <td className="p-4 text-slate-400 whitespace-nowrap">
                       {new Date(ord.created_at).toLocaleDateString()}
                     </td>
                     <td className="p-4 text-right">
-                      <select
-                        value={ord.payment_status}
-                        onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value)}
-                        className="text-xs p-1 border border-slate-200 rounded-lg bg-white"
-                      >
-                        <option value="paid">Paid</option>
-                        <option value="pending">Pending</option>
-                        <option value="refunded">Refunded</option>
-                        <option value="failed">Failed</option>
-                      </select>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {ord.payment_status === 'pending_verification' || ord.payment_status === 'pending' ? (
+                          <>
+                            <button
+                              id={`approve-order-${ord.id}`}
+                              type="button"
+                              onClick={() => handleUpdateOrderStatus(ord.id, 'paid')}
+                              title="Approve Payment & Unlock Notes"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer shadow-xs transition-all shrink-0"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Approve</span>
+                            </button>
+                            <button
+                              id={`reject-order-${ord.id}`}
+                              type="button"
+                              onClick={() => handleUpdateOrderStatus(ord.id, 'rejected')}
+                              title="Reject Payment"
+                              className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-all shrink-0"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              <span>Reject</span>
+                            </button>
+                          </>
+                        ) : null}
+
+                        <select
+                          value={ord.payment_status}
+                          onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value)}
+                          className="text-xs p-1.5 border border-slate-200 rounded-lg bg-white shrink-0 font-medium"
+                        >
+                          <option value="paid">Paid (Approved)</option>
+                          <option value="pending_verification">Pending Verification</option>
+                          <option value="pending">Pending</option>
+                          <option value="rejected">Rejected</option>
+                          <option value="refunded">Refunded</option>
+                          <option value="failed">Failed</option>
+                        </select>
+                      </div>
                     </td>
                   </tr>
                 ))}

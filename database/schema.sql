@@ -104,7 +104,7 @@ CREATE TABLE `orders` (
   `discount_amount` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
   `coupon_code` VARCHAR(50) DEFAULT NULL,
   `total_amount` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-  `payment_status` ENUM('pending', 'paid', 'failed', 'refunded') NOT NULL DEFAULT 'pending',
+  `payment_status` ENUM('pending', 'pending_verification', 'paid', 'failed', 'refunded', 'rejected') NOT NULL DEFAULT 'pending',
   `payment_method` VARCHAR(50) DEFAULT 'razorpay',
   `razorpay_order_id` VARCHAR(100) DEFAULT NULL,
   `razorpay_payment_id` VARCHAR(100) DEFAULT NULL,

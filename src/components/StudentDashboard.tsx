@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   Clock,
+  XCircle,
   Sparkles,
   AlertCircle,
   Key,
@@ -586,18 +587,50 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                     <div className="flex items-center gap-3">
                       <span className="font-bold text-slate-900">Total: ₹{ord.total_amount}</span>
                       <span
-                        className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                        className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 ${
                           ord.payment_status === 'paid'
                             ? 'bg-emerald-100 text-emerald-800'
+                            : ord.payment_status === 'pending_verification'
+                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                            : ord.payment_status === 'rejected'
+                            ? 'bg-rose-100 text-rose-800 border border-rose-300'
                             : ord.payment_status === 'refunded'
                             ? 'bg-purple-100 text-purple-800'
-                            : 'bg-amber-100 text-amber-800'
+                            : 'bg-slate-100 text-slate-700'
                         }`}
                       >
-                        {ord.payment_status}
+                        {ord.payment_status === 'pending_verification' && <Clock className="w-3 h-3" />}
+                        {ord.payment_status === 'paid' && <CheckCircle2 className="w-3 h-3" />}
+                        {ord.payment_status === 'rejected' && <XCircle className="w-3 h-3" />}
+                        <span>{ord.payment_status?.replace('_', ' ')}</span>
                       </span>
                     </div>
                   </div>
+
+                  {ord.payment_status === 'pending_verification' && (
+                    <div className="bg-amber-50/90 border-b border-amber-200 px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-amber-900">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
+                        <span className="font-semibold">
+                          Payment Submitted for Verification — Our team will verify your UTR and unlock your notes within 15–30 minutes.
+                        </span>
+                      </div>
+                      {ord.razorpay_payment_id && (
+                        <span className="font-mono font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded text-[11px] shrink-0 border border-amber-300/60">
+                          UTR: {ord.razorpay_payment_id.replace(/^UPI-/, '')}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {ord.payment_status === 'rejected' && (
+                    <div className="bg-rose-50 border-b border-rose-200 px-6 py-2.5 flex items-center gap-2 text-xs text-rose-900">
+                      <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>
+                        This payment reference could not be verified by our team. If you were charged, please reach out to support with your bank receipt.
+                      </span>
+                    </div>
+                  )}
 
                   <div className="p-6 divide-y divide-slate-100">
                     {ord.items?.map((item) => (
@@ -615,19 +648,37 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleDownload(item.note_id)}
-                            className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            <span>Download</span>
-                          </button>
-                          <button
-                            onClick={() => handleOpenRefund(ord, item.note_id)}
-                            className="text-slate-400 hover:text-rose-600 text-xs px-2 py-1 transition-colors cursor-pointer"
-                          >
-                            Need Refund?
-                          </button>
+                          {ord.payment_status === 'paid' ? (
+                            <>
+                              <button
+                                onClick={() => handleDownload(item.note_id)}
+                                className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>Download PDF</span>
+                              </button>
+                              <button
+                                onClick={() => handleOpenRefund(ord, item.note_id)}
+                                className="text-slate-400 hover:text-rose-600 text-xs px-2 py-1 transition-colors cursor-pointer"
+                              >
+                                Need Refund?
+                              </button>
+                            </>
+                          ) : ord.payment_status === 'pending_verification' ? (
+                            <span className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>Unlocks upon verification</span>
+                            </span>
+                          ) : ord.payment_status === 'rejected' ? (
+                            <span className="text-[11px] text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5">
+                              <XCircle className="w-3 h-3 text-rose-600" />
+                              <span>Payment Rejected</span>
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg font-medium">
+                              Pending Payment
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))}

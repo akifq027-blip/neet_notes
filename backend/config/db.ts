@@ -970,7 +970,7 @@ async function syncSchemaIfNeeded() {
         \`discount_amount\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
         \`coupon_code\` VARCHAR(50) DEFAULT NULL,
         \`total_amount\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-        \`payment_status\` ENUM('pending', 'paid', 'failed', 'refunded') NOT NULL DEFAULT 'pending',
+        \`payment_status\` ENUM('pending', 'pending_verification', 'paid', 'failed', 'refunded', 'rejected') NOT NULL DEFAULT 'pending',
         \`payment_method\` VARCHAR(50) DEFAULT 'razorpay',
         \`razorpay_order_id\` VARCHAR(100) DEFAULT NULL,
         \`razorpay_payment_id\` VARCHAR(100) DEFAULT NULL,
@@ -984,6 +984,11 @@ async function syncSchemaIfNeeded() {
         INDEX \`idx_orders_payment_status\` (\`payment_status\`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    // Ensure payment_status enum supports pending_verification and rejected
+    try {
+      await pool.query(`ALTER TABLE \`orders\` MODIFY COLUMN \`payment_status\` ENUM('pending', 'pending_verification', 'paid', 'failed', 'refunded', 'rejected') NOT NULL DEFAULT 'pending';`);
+    } catch (e) { /* ignore */ }
 
     // 5. Order items
     await pool.query(`

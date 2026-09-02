@@ -332,81 +332,61 @@ export async function verifyUpiPayment(req: AuthRequest, res: Response) {
       return res.status(400).json({ success: false, message: 'Order ID is required.' });
     }
 
-    const cleanUtr = String(utr || '').trim();
-    if (!cleanUtr || cleanUtr.length < 6) {
+    const cleanUtr = String(utr || '').trim().replace(/[^a-zA-Z0-9]/g, '');
+    if (!cleanUtr || cleanUtr.length < 12) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide a valid 12-digit UPI Reference / UTR / Transaction ID from your payment app.',
+        message: 'Please enter your mandatory 12-digit UPI Reference / UTR Number from your payment app receipt.',
       });
     }
 
-    const paymentMethodLabel = appName ? `upi_${appName.toLowerCase().replace(/[^a-z0-9]/g, '')}` : 'upi_direct';
+    const paymentMethodLabel = appName ? `UPI (${appName})` : 'UPI Manual';
     const cleanRefId = `UPI-${cleanUtr.toUpperCase()}`;
 
-    // Update order to paid
+    // Update order status to pending_verification (manual admin verification workflow)
     if (isMySQLConnected()) {
       const pool = getPool();
       if (pool) {
         // Prevent duplicate UTR reuse
         const [existing]: any = await pool.query(
-          `SELECT id FROM orders WHERE razorpay_payment_id = ? AND id != ? AND payment_status = 'paid'`,
+          `SELECT id FROM orders WHERE razorpay_payment_id = ? AND id != ? AND payment_status IN ('paid', 'pending_verification')`,
           [cleanRefId, orderId]
         );
         if (existing && existing.length > 0) {
           return res.status(400).json({
             success: false,
-            message: 'This UPI Transaction Reference (UTR) has already been utilized for another order.',
+            message: 'This UPI Transaction Reference (UTR) has already been submitted for another order.',
           });
         }
 
         await pool.query(
-          `UPDATE orders SET payment_status = 'paid', payment_method = ?, razorpay_payment_id = ?, updated_at = NOW() WHERE id = ? AND user_id = ?`,
+          `UPDATE orders SET payment_status = 'pending_verification', payment_method = ?, razorpay_payment_id = ?, updated_at = NOW() WHERE id = ? AND user_id = ?`,
           [paymentMethodLabel, cleanRefId, orderId, req.user.id]
         );
-
-        // Increment purchase counts
-        const [items]: any = await pool.query('SELECT note_id FROM order_items WHERE order_id = ?', [orderId]);
-        for (const item of items) {
-          await pool.query('UPDATE notes SET purchase_count = purchase_count + 1 WHERE id = ?', [item.note_id]);
-        }
-
-        const [ord]: any = await pool.query('SELECT coupon_code FROM orders WHERE id = ?', [orderId]);
-        if (ord[0]?.coupon_code) {
-          await pool.query('UPDATE coupons SET times_used = times_used + 1 WHERE code = ?', [ord[0].coupon_code]);
-        }
       }
     } else {
       const order = memoryStore.orders.find(o => o.id === parseInt(orderId, 10) && o.user_id === req.user?.id);
       if (order) {
-        order.payment_status = 'paid';
+        order.payment_status = 'pending_verification';
         order.payment_method = paymentMethodLabel;
         order.razorpay_payment_id = cleanRefId;
-
-        const items = memoryStore.order_items.filter(oi => oi.order_id === order.id);
-        items.forEach(item => {
-          const note = memoryStore.notes.find(n => n.id === item.note_id);
-          if (note) note.purchase_count = (note.purchase_count || 0) + 1;
-        });
-
-        if (order.coupon_code) {
-          const cp = memoryStore.coupons.find(c => c.code === order.coupon_code);
-          if (cp) cp.times_used = (cp.times_used || 0) + 1;
-        }
       }
     }
 
     // Return masked UTR for privacy
-    const maskedRef = cleanUtr.length > 4 ? `****${cleanUtr.slice(-4)}` : '****';
+    const maskedRef = cleanUtr.length > 4 ? `****${cleanUtr.slice(-4)}` : cleanUtr;
 
     return res.json({
       success: true,
-      message: 'UPI payment received and validated successfully! Notes have been unlocked in your library.',
+      status: 'pending_verification',
+      message: 'Payment Submitted for Verification — Our team will verify your UTR and unlock your notes within 15–30 minutes.',
       orderId,
       maskedReference: maskedRef,
+      utr: cleanUtr,
     });
   } catch (error: any) {
     console.error('[Verify UPI Error]', error);
-    return res.status(500).json({ success: false, message: 'Failed to complete UPI payment verification.' });
+    return res.status(500).json({ success: false, message: 'Failed to submit UPI payment for verification.' });
   }
 }
 
