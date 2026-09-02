@@ -301,7 +301,9 @@ export async function createAdminNote(req: Request, res: Response) {
       }
     }
 
-    const newId = memoryStore.nextIds.notes++;
+    const maxExistingId = memoryStore.notes.reduce((max, n) => Math.max(max, Number(n.id) || 0), 20);
+    const newId = Math.max(maxExistingId + 1, (memoryStore.nextIds.notes || 22));
+    memoryStore.nextIds.notes = newId + 1;
     const newNote = {
       id: newId,
       title: title.trim(),

@@ -33,7 +33,7 @@ export const memoryStore = {
   nextIds: {
     users: 3,
     categories: 8,
-    notes: 9,
+    notes: 22,
     orders: 2,
     order_items: 2,
     downloads: 1,
@@ -699,7 +699,40 @@ export async function initDatabase() {
       status: 'published',
       created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
     },
+    {
+      id: 21,
+      title: 'Class 11 Biology: Cell - The Unit of Life',
+      slug: 'class-11-biology-cell-the-unit-of-life',
+      description: 'Comprehensive NCERT class 11 biology handwritten study notes covering Cell: The Unit of Life, cell theory, prokaryotic & eukaryotic cell structure, organelle functions, endomembrane system, and high-yield NEET revision diagrams.',
+      subject: 'Biology',
+      class_level: 'Class 11',
+      exam: 'NEET & Boards',
+      resource_type: 'Notes',
+      chapter: 'Cell: The Unit of Life',
+      category_id: 1,
+      price: 1.00,
+      original_price: 99.00,
+      thumbnail: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=80',
+      pdf_file: 'Biology_Notes__Cell___The_Unit_of_Life-1788364226209-967035391.pdf',
+      preview_file: null,
+      preview_pages: 3,
+      total_pages: 45,
+      file_size_mb: 1.14,
+      is_free: 0,
+      is_featured: 1,
+      is_bestseller: 1,
+      author_name: 'NEET Expert Faculty',
+      rating_avg: 5.0,
+      rating_count: 14,
+      purchase_count: 24,
+      download_count: 36,
+      status: 'published',
+      created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+    },
   ];
+
+  // Dynamically calculate strictly unique next note ID
+  memoryStore.nextIds.notes = Math.max(22, ...memoryStore.notes.map((n: any) => Number(n.id) || 0)) + 1;
 
   memoryStore.coupons = [
     { id: 1, code: 'NEET20', description: 'Special 20% discount on all notes and question banks', discount_type: 'percentage', discount_value: 20.00, minimum_amount: 0.00, usage_limit: 1000, times_used: 42, expiry_date: '2026-12-31', active: 1 },

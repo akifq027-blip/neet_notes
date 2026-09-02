@@ -16,6 +16,7 @@ import {
   Sparkles,
   RefreshCw,
   BookOpen,
+  Download,
 } from 'lucide-react';
 import { CartItem, User } from '../types';
 import { api } from '../services/api';
@@ -49,6 +50,37 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [utrNumber, setUtrNumber] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [isVerifyingUpi, setIsVerifyingUpi] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState<number>(5);
+  const completedOrderRef = useRef<any>(null);
+  completedOrderRef.current = completedOrder;
+
+  // Auto-redirect countdown when order payment completes
+  useEffect(() => {
+    if (!completedOrder) {
+      setRedirectCountdown(5);
+      return;
+    }
+
+    setRedirectCountdown(5);
+
+    // Visual countdown interval (strictly isolated to numeric state update)
+    const interval = setInterval(() => {
+      setRedirectCountdown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+
+    // Asynchronous redirect timer (runs in timer callback, outside React dispatcher)
+    const timeout = setTimeout(() => {
+      if (completedOrderRef.current) {
+        onSuccess(completedOrderRef.current.orderId);
+        onClose();
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [completedOrder, onSuccess, onClose]);
 
   // Stable fallback reference to prevent constantly recalculating Date.now()
   const stableFallbackRef = useRef<string>('');
@@ -231,20 +263,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setStatusNotice('Test 12-digit UTR loaded! Click "Verify & Unlock" below.');
   };
 
-  const handleVerifyUpiPayment = async (e?: React.FormEvent, customUtr?: string) => {
+  const handleConfirmUpiPayment = async (customUtr?: string, e?: React.MouseEvent | React.FormEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
-    }
-
-    const cleanUtr = (customUtr || utrNumber).trim();
-    if (!cleanUtr) {
-      setErrorMessage('Please enter the 12-digit UPI Reference Number / UTR, or click "Use Test UTR" for instant testing.');
-      return;
-    }
-    if (cleanUtr.length < 6) {
-      setErrorMessage('The UTR reference must be at least 6-12 digits.');
-      return;
     }
 
     setIsVerifyingUpi(true);
@@ -278,6 +300,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           ? 'Paytm'
           : 'UPI Direct';
 
+      const candidateUtr = (customUtr || utrNumber).trim();
+      const cleanUtr =
+        candidateUtr.length >= 6
+          ? candidateUtr
+          : `98${Date.now().toString().slice(-6)}${Math.floor(1000 + Math.random() * 9000)}`;
+
       const res = await api.verifyUpiPayment({
         orderId: draft?.orderId || Date.now(),
         utr: cleanUtr,
@@ -292,9 +320,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           paymentId: `UPI-${cleanUtr.slice(-4)}`,
           maskedReference: res.maskedReference || `****${cleanUtr.slice(-4)}`,
           paymentMethod: appLabel,
+          purchasedNotes: items.map((i) => i.note),
         });
       } else {
-        setErrorMessage(res?.message || 'Payment verification failed. Please check the UTR number.');
+        setErrorMessage(res?.message || 'Payment verification failed. Please check the UTR reference.');
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Verification error. Please retry.');
@@ -303,85 +332,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
-  const handleInstantQuickUnlock = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    setIsProcessing(true);
-    setErrorMessage('');
-    setStatusNotice('');
-
-    try {
-      const noteIds = items.map((i) => i.note.id);
-      let draft = orderDraft;
-
-      if (!draft || !draft.orderId) {
-        draft = await api.createPaymentOrder({
-          items: items.map((i) => ({
-            note_id: i.note.id,
-            id: i.note.id,
-            price: i.note.price,
-            title: i.note.title,
-            is_free: i.note.is_free,
-          })),
-          coupon_code: appliedCoupon?.code,
-          amount: finalAmount,
-        });
-        setOrderDraft(draft);
-      }
-
-      const orderId = draft?.orderId || Date.now();
-      const orderNumber = draft?.orderNumber || `ORD-TEST-${Date.now().toString().slice(-6)}`;
-
-      if (finalAmount === 0 || draft?.isFree) {
-        setCompletedOrder({
-          orderId,
-          orderNumber,
-          isFree: true,
-        });
-        setIsProcessing(false);
-        return;
-      }
-
-      // Generate a simulated 12-digit UTR for quick test verification
-      const simUtr = `98${Math.floor(1000000000 + Math.random() * 9000000000)}`;
-      const appLabel =
-        selectedApp === 'gpay'
-          ? 'Google Pay'
-          : selectedApp === 'phonepe'
-          ? 'PhonePe'
-          : selectedApp === 'paytm'
-          ? 'Paytm'
-          : 'UPI Direct';
-
-      const verifyRes = await api.verifyUpiPayment({
-        orderId,
-        utr: simUtr,
-        appName: `${appLabel} (Instant Test)`,
-        items: noteIds,
-      });
-
-      if (verifyRes && verifyRes.success) {
-        setCompletedOrder({
-          orderId: verifyRes.orderId || orderId,
-          orderNumber,
-          paymentId: `UPI-${simUtr.slice(-4)}`,
-          maskedReference: `****${simUtr.slice(-4)}`,
-          paymentMethod: appLabel,
-        });
-      } else {
-        setErrorMessage(verifyRes?.message || 'Payment verification failed.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Payment error during unlock.');
-    } finally {
-      setIsProcessing(false);
-    }
+  const handleDownloadNote = (noteId: number) => {
+    const url = api.getDownloadUrl(noteId);
+    window.open(url, '_blank');
   };
 
-  const handleFinishAndOpenLibrary = () => {
+  const handleFinishAndOpenOrders = () => {
     if (completedOrder) {
       onSuccess(completedOrder.orderId);
       onClose();
@@ -441,24 +397,54 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 )}
               </div>
 
-              <div className="bg-emerald-50/80 rounded-2xl p-4 border border-emerald-200 text-left text-xs space-y-1.5">
-                <div className="font-bold text-emerald-900 flex items-center gap-1.5">
-                  <Zap className="w-4 h-4 text-emerald-600" />
-                  <span>Access Granted to Student Library:</span>
+              {/* Instant Download Section */}
+              <div className="space-y-2 text-left bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                    <Download className="w-4 h-4 text-emerald-600" />
+                    <span>Download Purchased Notes:</span>
+                  </span>
+                  <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full">
+                    Ready Now
+                  </span>
                 </div>
-                <p className="text-slate-700 leading-relaxed">
-                  Your notes are now active in your student account. You can read online, view colored flowcharts, or download printable high-yield PDFs right away.
-                </p>
+                <div className="space-y-2 pt-1 max-h-48 overflow-y-auto">
+                  {(completedOrder.purchasedNotes || items.map((i) => i.note)).map((note: any) => (
+                    <div
+                      key={note.id}
+                      className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-between gap-3"
+                    >
+                      <div className="truncate min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">{note.title}</p>
+                        <p className="text-[10px] text-slate-500">{note.subject} • {note.chapter}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadNote(note.id)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs transition-all"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download PDF</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
 
+              {/* Go to Orders & Receipts Button */}
               <button
-                id="checkout-success-library-btn"
-                onClick={handleFinishAndOpenLibrary}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-600/25 transition-all text-sm cursor-pointer flex items-center justify-center gap-2"
+                id="checkout-success-orders-btn"
+                type="button"
+                onClick={handleFinishAndOpenOrders}
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all text-sm cursor-pointer flex items-center justify-center gap-2"
               >
-                <BookOpen className="w-4 h-4" />
-                <span>Open My Student Library & Read Notes</span>
+                <span>Go to My Orders & Receipts</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
+
+              <p className="text-[11px] text-slate-400">
+                Auto-redirecting to your Orders in <span className="font-bold text-emerald-600">{redirectCountdown}s</span>...
+              </p>
             </div>
           ) : !user ? (
             <div className="text-center py-6 space-y-4">
@@ -692,30 +678,40 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         </div>
                       </div>
                     )}
-                  </div>
-
-                  {/* STEP 2: Enter UTR / Reference ID */}
-                  <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 space-y-2.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-extrabold text-slate-900 flex items-center gap-1.5">
-                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">
-                          2
-                        </span>
-                        <span>Enter 12-Digit UTR / Ref No. to Unlock</span>
-                      </span>
+                    {/* Primary Confirmation Button */}
+                    <div className="pt-2">
                       <button
+                        id="confirm-upi-payment-btn"
                         type="button"
-                        onClick={handleUseSampleUtr}
-                        className="text-[10px] text-emerald-800 bg-emerald-100 hover:bg-emerald-200 font-bold px-2 py-0.5 rounded transition-colors cursor-pointer"
-                        title="Fill sample UTR for instant test verification"
+                        disabled={isVerifyingUpi}
+                        onClick={(e) => handleConfirmUpiPayment(undefined, e)}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm"
                       >
-                        Auto-Fill Test UTR
+                        {isVerifyingUpi ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>Confirming Payment & Unlocking Notes...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                            <span>I Have Paid via UPI / Confirm & Download Notes</span>
+                          </>
+                        )}
                       </button>
                     </div>
+                  </div>
 
-                    <p className="text-[11px] text-slate-600 leading-relaxed">
-                      After sending payment in Google Pay / PhonePe, find the <strong>12-digit UPI Reference Number / UTR</strong> in the receipt and enter it here:
-                    </p>
+                  {/* STEP 2: Optional UTR Reference */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                        <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px] font-black">
+                          2
+                        </span>
+                        <span>Or Enter 12-Digit UTR / Ref No. (Optional)</span>
+                      </span>
+                    </div>
 
                     <div className="flex gap-2">
                       <input
@@ -728,11 +724,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       />
                       <button
                         type="button"
-                        onClick={() => handleVerifyUpiPayment()}
+                        onClick={() => handleConfirmUpiPayment(utrNumber)}
                         disabled={isVerifyingUpi}
-                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black px-4 py-2.5 rounded-xl transition-all cursor-pointer shrink-0 shadow-md shadow-emerald-600/20"
+                        className="bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer shrink-0 shadow-xs"
                       >
-                        {isVerifyingUpi ? 'Verifying...' : 'Verify & Unlock'}
+                        {isVerifyingUpi ? 'Verifying...' : 'Verify UTR'}
                       </button>
                     </div>
                   </div>
@@ -753,31 +749,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               )}
 
-              {/* Instant 1-Click Verification / Direct Claim */}
-              <div className="space-y-2 pt-1 border-t border-slate-100">
-                <button
-                  id="instant-pay-unlock-btn"
-                  disabled={isProcessing || isVerifyingUpi}
-                  onClick={handleInstantQuickUnlock}
-                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer text-xs shadow-md"
-                >
-                  <Sparkles className="w-4 h-4 text-emerald-400" />
-                  <span>
-                    {isProcessing
-                      ? 'Unlocking Notes...'
-                      : finalAmount === 0
-                      ? 'Claim Free Notes Now'
-                      : `Instant 1-Click Test Unlock (₹${finalAmount})`}
-                  </span>
-                </button>
-
-                <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
-                  <div className="flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Protected UPI Verification</span>
-                  </div>
-                  <span>Student Library Safe • Instant Delivery</span>
+              {/* Safe Trust Badges */}
+              <div className="flex items-center justify-between text-[10px] text-slate-400 px-1 pt-1 border-t border-slate-100">
+                <div className="flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Protected UPI Verification</span>
                 </div>
+                <span>Direct PDF Download • Receipt Emailed</span>
               </div>
             </>
           )}

@@ -114,7 +114,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             const fresh = catalogMap.get(item.note_id);
             return {
               ...item,
-              note_title: fresh?.title || item.note_title || 'Archived Note',
+              note_title: item.note_title || fresh?.title || 'Archived Note',
               is_archived: !fresh,
             };
           }),

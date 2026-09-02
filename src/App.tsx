@@ -785,7 +785,8 @@ export function App() {
         }}
         onSuccess={() => {
           setCartItems([]);
-          handleNavigate('library');
+          setDashboardInitialTab('orders');
+          setCurrentView('dashboard');
         }}
       />
 

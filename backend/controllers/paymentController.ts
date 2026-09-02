@@ -532,6 +532,7 @@ export async function getUserOrders(req: AuthRequest, res: Response) {
             const note = memoryStore.notes.find(n => n.id === item.note_id);
             return {
               ...item,
+              note_title: item.note_title || note?.title || 'Study Note',
               slug: note?.slug,
               subject: note?.subject,
               chapter: note?.chapter,
