@@ -141,8 +141,9 @@ export const PreviewReaderModal: React.FC<PreviewReaderModalProps> = ({
                 <span>Subject: {note.subject}</span>
                 <div className="flex items-center gap-2">
                   {activeSample?.imageUrl && (
-                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                      Scanned PDF Page
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/60 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5 text-blue-600" />
+                      Original Scan (300 DPI Ultra-HD)
                     </span>
                   )}
                   <span className="text-emerald-700 font-bold">{pageData.badge}</span>
@@ -160,20 +161,27 @@ export const PreviewReaderModal: React.FC<PreviewReaderModalProps> = ({
                   <img
                     src={activeSample.imageUrl}
                     alt={`Preview Page ${currentPage}`}
-                    className="w-full h-auto object-contain block select-none pointer-events-none"
+                    className="w-full h-auto object-contain block select-none pointer-events-none transition-all duration-200"
+                    style={{
+                      imageRendering: 'high-quality',
+                      WebkitFontSmoothing: 'subpixel-antialiased',
+                    }}
                     draggable={false}
                     onContextMenu={(e) => e.preventDefault()}
                   />
                   {/* Subtle watermark */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 rotate-[-25deg]">
-                    <span className="text-2xl sm:text-4xl font-black text-slate-900 tracking-widest uppercase">
+                    <span className="text-2xl sm:text-4xl font-black text-slate-900 tracking-widest uppercase font-mono">
                       SAMPLE PREVIEW ONLY
                     </span>
                   </div>
                 </div>
 
                 <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3.5 text-xs text-slate-700 leading-relaxed">
-                  <p className="font-semibold text-emerald-900 mb-1">NCERT Page Extract:</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="font-semibold text-emerald-900">NCERT Page Extract:</p>
+                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Print-Grade Vector Clarity</span>
+                  </div>
                   <p>{activeSample.contentSnippet}</p>
                 </div>
               </div>

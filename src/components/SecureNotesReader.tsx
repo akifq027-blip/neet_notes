@@ -559,9 +559,9 @@ export const SecureNotesReader: React.FC<SecureNotesReaderProps> = ({
               {zoomLevel}%
             </span>
             <button
-              onClick={() => setZoomLevel((z) => Math.min(175, z + 15))}
+              onClick={() => setZoomLevel((z) => Math.min(200, z + 15))}
               className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-              title="Zoom In"
+              title="Zoom In (Up to 200% Retina sharpness)"
             >
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
@@ -722,10 +722,12 @@ export const SecureNotesReader: React.FC<SecureNotesReaderProps> = ({
             </div>
           ) : (
             <div
-              className={`w-full max-w-3xl rounded-2xl border p-6 sm:p-10 md:p-12 relative overflow-hidden transition-all duration-200 ${themeCls.paper}`}
+              className={`w-full ${viewMode === 'pdf' ? 'max-w-4xl' : 'max-w-3xl'} rounded-2xl border p-6 sm:p-10 md:p-12 relative overflow-hidden transition-all duration-200 ${themeCls.paper}`}
               style={{
                 transform: `scale(${zoomLevel / 100})`,
                 transformOrigin: 'top center',
+                transformStyle: 'preserve-3d',
+                backfaceVisibility: 'hidden',
               }}
             >
               {/* =======================================================
@@ -769,8 +771,9 @@ export const SecureNotesReader: React.FC<SecureNotesReaderProps> = ({
                     </span>
                     <div className="flex items-center gap-2">
                       {activePageData.imageUrl && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                          Original PDF Page
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1">
+                          <Sparkles className="w-2.5 h-2.5" />
+                          300 DPI Ultra-HD Scan
                         </span>
                       )}
                       <span className="font-bold text-emerald-600 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-[11px] uppercase tracking-wider">
@@ -793,6 +796,12 @@ export const SecureNotesReader: React.FC<SecureNotesReaderProps> = ({
                         src={activePageData.imageUrl}
                         alt={`Page ${activePageData.pageNumber} - ${activePageData.sectionTitle}`}
                         className="w-full h-auto object-contain block pointer-events-none select-none transition-all duration-200"
+                        style={{
+                          imageRendering: 'high-quality',
+                          WebkitFontSmoothing: 'subpixel-antialiased',
+                          backfaceVisibility: 'hidden',
+                          transform: 'translateZ(0)',
+                        }}
                         draggable={false}
                         onContextMenu={(e) => {
                           e.preventDefault();
