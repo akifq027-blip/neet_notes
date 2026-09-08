@@ -464,8 +464,41 @@ export async function updateAdminNote(req: Request, res: Response) {
       }
     }
 
-    const note = memoryStore.notes.find(n => n.id === noteId);
-    if (!note) return res.status(404).json({ success: false, message: 'Note not found' });
+    let note = memoryStore.notes.find(n => Number(n.id) === Number(noteId));
+    if (!note) {
+      // Upsert into memory store if note existed locally or was recently uploaded
+      note = {
+        id: noteId,
+        title: title || 'New Study Note',
+        slug: (title || 'note').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + noteId,
+        description: description || '',
+        subject: subject || 'Biology',
+        class_level: class_level || 'NEET',
+        exam: exam || 'NEET',
+        resource_type: resource_type || 'Notes',
+        chapter: chapter || 'Overview',
+        category_id: parseInt(category_id, 10) || 1,
+        price: parseFloat(price) || 0,
+        original_price: parseFloat(original_price) || 0,
+        thumbnail: thumbnail_url || 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=80',
+        pdf_file: pdf_url || 'sample-handbook.pdf',
+        preview_file: sample_pdf_url || null,
+        preview_pages: parseInt(preview_pages, 10) || 4,
+        total_pages: parseInt(total_pages, 10) || 40,
+        file_size_mb: 2.5,
+        is_free: is_free === '1' || is_free === 'true' || is_free === 1 || is_free === true ? 1 : 0,
+        is_featured: is_featured === '1' || is_featured === 'true' || is_featured === 1 || is_featured === true ? 1 : 0,
+        is_bestseller: is_bestseller === '1' || is_bestseller === 'true' || is_bestseller === 1 || is_bestseller === true ? 1 : 0,
+        author_name: author_name || 'Faculty Expert',
+        rating_avg: 5.0,
+        rating_count: 1,
+        purchase_count: 0,
+        download_count: 0,
+        status: status || 'published',
+        created_at: new Date().toISOString(),
+      };
+      memoryStore.notes.unshift(note);
+    }
 
     if (title) note.title = title.trim();
     if (description) note.description = description.trim();
@@ -518,7 +551,7 @@ export async function deleteAdminNote(req: Request, res: Response) {
       }
     }
 
-    const idx = memoryStore.notes.findIndex(n => n.id === noteId);
+    const idx = memoryStore.notes.findIndex(n => Number(n.id) === Number(noteId));
     if (idx >= 0) {
       memoryStore.notes.splice(idx, 1);
     }

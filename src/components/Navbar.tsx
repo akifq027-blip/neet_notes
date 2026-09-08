@@ -6,6 +6,7 @@ import {
   Heart,
   User as UserIcon,
   LogOut,
+  LogIn,
   ShieldCheck,
   Menu,
   X,
@@ -195,15 +196,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
 
-            {/* User Account / Auth Buttons - Desktop Only (>= lg) */}
+            {/* User Account / Auth Buttons */}
             {user ? (
-              <div className="hidden lg:block relative">
+              <div className="relative">
                 <button
                   id="user-menu-btn"
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className="flex items-center gap-2 p-1 pl-1.5 pr-3 py-1 rounded-full border-2 border-teal-200 hover:border-teal-400 bg-teal-50/50 hover:bg-teal-50 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 p-1 pl-1.5 pr-2.5 py-1 rounded-full border-2 border-teal-200 hover:border-teal-400 bg-teal-50/50 hover:bg-teal-50 transition-all cursor-pointer"
+                  aria-label="User Account Menu"
                 >
-                  <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-teal-100 text-teal-700 font-black text-xs sm:text-sm flex items-center justify-center border border-teal-200">
+                  <div className="h-7 w-7 rounded-full bg-teal-600 text-white font-black text-xs flex items-center justify-center border border-teal-200 shadow-xs">
                     {user.name.charAt(0).toUpperCase()}
                   </div>
                   <span className="text-xs font-bold text-slate-800 max-w-[80px] truncate hidden md:inline">
@@ -211,9 +213,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </span>
                 </button>
 
+                {/* Dropdown Menu Backdrop */}
+                {userDropdownOpen && (
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setUserDropdownOpen(false)}
+                    aria-hidden="true"
+                  />
+                )}
+
                 {/* Dropdown Menu */}
                 {userDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 text-sm animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 text-sm animate-in fade-in slide-in-from-top-2 duration-150">
                     <div className="px-4 py-2.5 border-b border-slate-100">
                       <p className="font-extrabold text-slate-900 truncate">{user.name}</p>
                       <p className="text-xs text-slate-500 font-medium truncate">{user.email}</p>
@@ -289,18 +300,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
             ) : (
-              <div className="hidden lg:flex items-center gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <button
                   id="navbar-login-btn"
                   onClick={() => onOpenAuth('login')}
-                  className="text-xs sm:text-sm font-bold text-slate-700 hover:text-teal-600 px-2.5 sm:px-3.5 py-2 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                  className="text-xs sm:text-sm font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 lg:bg-transparent lg:text-slate-700 lg:hover:text-teal-600 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg lg:hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-1"
                 >
-                  Log In
+                  <LogIn className="w-3.5 h-3.5 text-teal-600 lg:hidden" />
+                  <span>Log In</span>
                 </button>
                 <button
                   id="navbar-register-btn"
                   onClick={() => onOpenAuth('register')}
-                  className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-black uppercase tracking-wider px-3 sm:px-4 py-2 rounded-lg shadow-sm transition-all cursor-pointer"
+                  className="hidden sm:inline-flex bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-black uppercase tracking-wider px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg shadow-sm transition-all cursor-pointer"
                 >
                   Sign Up
                 </button>

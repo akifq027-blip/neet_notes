@@ -218,7 +218,7 @@ export function App() {
     if (reopenCheckoutAfterAuth) {
       setReopenCheckoutAfterAuth(false);
       setIsCheckoutOpen(true);
-    } else if (user.role === 'admin' && authMode === 'admin') {
+    } else if (user.role === 'admin') {
       setCurrentView('admin');
     }
   };

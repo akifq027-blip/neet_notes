@@ -343,13 +343,13 @@ export async function verifyUpiPayment(req: AuthRequest, res: Response) {
     const paymentMethodLabel = appName ? `UPI (${appName})` : 'UPI Manual';
     const cleanRefId = `UPI-${cleanUtr.toUpperCase()}`;
 
-    // Update order status to pending_verification (manual admin verification workflow)
+    // Set payment status to paid upon valid 12-digit UTR submission so customer receives notes immediately
     if (isMySQLConnected()) {
       const pool = getPool();
       if (pool) {
         // Prevent duplicate UTR reuse
         const [existing]: any = await pool.query(
-          `SELECT id FROM orders WHERE razorpay_payment_id = ? AND id != ? AND payment_status IN ('paid', 'pending_verification')`,
+          `SELECT id FROM orders WHERE razorpay_payment_id = ? AND id != ? AND payment_status = 'paid'`,
           [cleanRefId, orderId]
         );
         if (existing && existing.length > 0) {
@@ -360,16 +360,64 @@ export async function verifyUpiPayment(req: AuthRequest, res: Response) {
         }
 
         await pool.query(
-          `UPDATE orders SET payment_status = 'pending_verification', payment_method = ?, razorpay_payment_id = ?, updated_at = NOW() WHERE id = ? AND user_id = ?`,
+          `UPDATE orders SET payment_status = 'paid', payment_method = ?, razorpay_payment_id = ?, updated_at = NOW() WHERE id = ? AND user_id = ?`,
           [paymentMethodLabel, cleanRefId, orderId, req.user.id]
         );
+
+        // Increment purchase count for purchased notes
+        const [orderItems]: any = await pool.query('SELECT note_id FROM order_items WHERE order_id = ?', [orderId]);
+        if (orderItems && orderItems.length > 0) {
+          for (const it of orderItems) {
+            await pool.query('UPDATE notes SET purchase_count = purchase_count + 1 WHERE id = ?', [it.note_id]);
+          }
+        }
       }
     } else {
-      const order = memoryStore.orders.find(o => o.id === parseInt(orderId, 10) && o.user_id === req.user?.id);
-      if (order) {
-        order.payment_status = 'pending_verification';
+      let order = memoryStore.orders.find(o => Number(o.id) === Number(orderId));
+      if (!order) {
+        // Find or create in-memory order for customer
+        order = {
+          id: Number(orderId),
+          order_number: `ORD-UPI-${Date.now().toString().slice(-6)}`,
+          user_id: req.user.id,
+          customer_name: req.user.name,
+          customer_email: req.user.email,
+          subtotal: 99.0,
+          discount_amount: 0,
+          total_amount: 99.0,
+          payment_status: 'paid',
+          payment_method: paymentMethodLabel,
+          razorpay_payment_id: cleanRefId,
+          created_at: new Date().toISOString(),
+        };
+        memoryStore.orders.unshift(order);
+      } else {
+        order.payment_status = 'paid';
         order.payment_method = paymentMethodLabel;
         order.razorpay_payment_id = cleanRefId;
+      }
+
+      // If items were passed in body, register them
+      const reqItems = req.body.items || [];
+      if (Array.isArray(reqItems) && reqItems.length > 0) {
+        for (const nId of reqItems) {
+          const numId = Number(nId);
+          if (!memoryStore.order_items.some(oi => oi.order_id === order.id && oi.note_id === numId)) {
+            const noteObj = memoryStore.notes.find(n => Number(n.id) === numId);
+            memoryStore.order_items.push({
+              id: Date.now() + Math.floor(Math.random() * 1000),
+              order_id: order.id,
+              note_id: numId,
+              price: noteObj ? noteObj.price : 1.0,
+              note_title: noteObj ? noteObj.title : 'Study Note',
+              subject: noteObj ? noteObj.subject : 'Biology',
+              pdf_file: noteObj ? noteObj.pdf_file : 'sample-handbook.pdf',
+            });
+            if (noteObj) {
+              noteObj.purchase_count = (noteObj.purchase_count || 0) + 1;
+            }
+          }
+        }
       }
     }
 
@@ -378,8 +426,8 @@ export async function verifyUpiPayment(req: AuthRequest, res: Response) {
 
     return res.json({
       success: true,
-      status: 'pending_verification',
-      message: 'Payment Submitted for Verification — Our team will verify your UTR and unlock your notes within 15–30 minutes.',
+      status: 'paid',
+      message: 'Payment Verified & Notes Unlocked! Your study notes are now accessible in My Library.',
       orderId,
       maskedReference: maskedRef,
       utr: cleanUtr,

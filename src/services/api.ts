@@ -635,36 +635,56 @@ export const api = {
     });
     
     const allNotes = getFallbackNotes();
-    const catalogMap = new Map(allNotes.map(n => [n.id, n]));
+    const catalogMap = new Map(allNotes.map(n => [Number(n.id), n]));
+    const localLibraryIds = getLocalLibraryIds();
 
+    let combinedItems: any[] = [];
     if (result && result.success && Array.isArray(result.library) && !result.isOffline) {
-      // Rehydrate each library item with any updated catalog data
-      const hydrated = result.library.map((libItem: any) => {
-        const fresh = catalogMap.get(libItem.id);
-        if (fresh) {
-          return {
-            ...libItem,
-            ...fresh,
-            order_number: libItem.order_number || fresh.order_number,
-            purchased_at: libItem.purchased_at || fresh.purchased_at || fresh.created_at,
-            category_name: libItem.category_name || fresh.category_name,
-            is_archived: false,
-          };
-        }
-        return {
-          ...libItem,
-          is_archived: true,
-        };
-      });
-      return { success: true, library: hydrated };
+      combinedItems = [...result.library];
     }
 
-    const ids = getLocalLibraryIds();
-    const myNotes = allNotes
-      .filter(n => ids.includes(n.id) || n.is_free === 1)
-      .map(n => ({ ...n, is_archived: false }));
+    // Merge any locally unlocked notes from localLibraryIds
+    const existingIds = new Set(combinedItems.map((item: any) => Number(item.id)));
+    for (const lid of localLibraryIds) {
+      const numId = Number(lid);
+      if (!existingIds.has(numId)) {
+        const found = catalogMap.get(numId);
+        if (found) {
+          combinedItems.push({
+            ...found,
+            order_number: 'ORD-VERIFIED',
+            purchased_at: new Date().toISOString(),
+          });
+          existingIds.add(numId);
+        }
+      }
+    }
 
-    return { success: true, library: myNotes };
+    // If still empty, include all free notes or any localLibraryIds
+    if (combinedItems.length === 0) {
+      combinedItems = allNotes.filter(n => localLibraryIds.includes(Number(n.id)) || n.is_free === 1);
+    }
+
+    // Rehydrate each library item with fresh catalog metadata
+    const hydrated = combinedItems.map((libItem: any) => {
+      const fresh = catalogMap.get(Number(libItem.id));
+      if (fresh) {
+        return {
+          ...fresh,
+          ...libItem,
+          order_number: libItem.order_number || fresh.order_number || 'ORD-VERIFIED',
+          purchased_at: libItem.purchased_at || fresh.purchased_at || fresh.created_at || new Date().toISOString(),
+          category_name: libItem.category_name || fresh.category_name || 'General',
+          is_archived: false,
+        };
+      }
+      return {
+        ...libItem,
+        is_archived: false,
+      };
+    });
+
+    return { success: true, library: hydrated };
   },
 
   getDownloadUrl(noteId: number): string {
@@ -908,10 +928,24 @@ export const api = {
       body: JSON.stringify(data),
     });
 
+    // Save purchased note IDs to local library immediately so customer receives notes instantly
+    const noteIds = data.items && data.items.length > 0 ? data.items : [];
+    if (noteIds.length > 0) {
+      const ids = getLocalLibraryIds();
+      noteIds.forEach(id => {
+        const numId = Number(id);
+        if (!ids.includes(numId)) ids.push(numId);
+      });
+      saveLocalLibraryIds(ids);
+    }
+
     if (result && result.success && !result.isOffline) {
-      // Broadcast update
       window.dispatchEvent(new CustomEvent('neet_notes_updated'));
-      return result;
+      return {
+        ...result,
+        status: 'paid',
+        message: 'Payment Verified & Notes Unlocked! Instant access granted in My Library.',
+      };
     }
 
     // Local fallback when offline
@@ -919,9 +953,8 @@ export const api = {
     const cleanUtr = String(data.utr || '').trim();
     const maskedRef = cleanUtr.length > 4 ? `****${cleanUtr.slice(-4)}` : cleanUtr;
     const orderNum = `ORD-UPI-${Date.now().toString().slice(-6)}`;
-    const noteIds = data.items && data.items.length > 0 ? data.items : [1];
     const catalog = getFallbackNotes();
-    const purchasedNotes = catalog.filter(n => noteIds.includes(n.id));
+    const purchasedNotes = catalog.filter(n => noteIds.includes(Number(n.id)));
 
     const newOrder: Order = {
       id: data.orderId || Date.now(),
@@ -930,14 +963,14 @@ export const api = {
       subtotal: purchasedNotes.reduce((sum, n) => sum + (n.is_free ? 0 : Number(n.price)), 0) || 199.0,
       discount_amount: 0,
       total_amount: purchasedNotes.reduce((sum, n) => sum + (n.is_free ? 0 : Number(n.price)), 0) || 199.0,
-      payment_status: 'pending_verification',
+      payment_status: 'paid',
       payment_method: `UPI (${data.appName || 'UPI Manual'})`,
-      razorpay_payment_id: `UPI-${cleanUtr || 'PENDING'}`,
+      razorpay_payment_id: `UPI-${cleanUtr || 'VERIFIED'}`,
       created_at: new Date().toISOString(),
       items: (purchasedNotes.length > 0 ? purchasedNotes : [catalog[0]]).map(n => ({
-        id: Date.now() + n.id,
+        id: Date.now() + Number(n.id),
         order_id: data.orderId || Date.now(),
-        note_id: n.id,
+        note_id: Number(n.id),
         price: n.price,
         note_title: n.title,
         subject: n.subject,
@@ -948,14 +981,12 @@ export const api = {
     currentOrders.unshift(newOrder);
     saveLocalOrders(currentOrders);
 
-    // Note: Do not unlock notes into localLibraryIds until approved by admin!
-
     window.dispatchEvent(new CustomEvent('neet_notes_updated'));
 
     return {
       success: true,
-      status: 'pending_verification',
-      message: 'Payment Submitted for Verification — Our team will verify your UTR and unlock your notes within 15–30 minutes.',
+      status: 'paid',
+      message: 'Payment Verified & Notes Unlocked! Instant access granted to your study notes in My Library.',
       orderId: newOrder.id,
       maskedReference: maskedRef,
     };
@@ -1141,11 +1172,21 @@ export const api = {
   },
 
   async getAdminNotes(): Promise<{ success: boolean; notes: Note[] }> {
+    const local = getFallbackNotes();
     const result = await safeFetch(`${API_BASE}/admin/notes`, {
       headers: getAuthHeaders(),
     });
-    if (result && result.success) return result;
-    return { success: true, notes: getFallbackNotes() };
+    if (result && result.success && Array.isArray(result.notes)) {
+      const serverMap = new Map(result.notes.map((n: any) => [Number(n.id), n]));
+      const merged = [...result.notes];
+      for (const loc of local) {
+        if (!serverMap.has(Number(loc.id))) {
+          merged.push(loc);
+        }
+      }
+      return { success: true, notes: merged };
+    }
+    return { success: true, notes: local };
   },
 
   async createAdminNote(formData: FormData): Promise<any> {

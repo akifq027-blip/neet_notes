@@ -92,6 +92,21 @@ export const AdminDashboard: React.FC = () => {
     loadTabContent();
   }, [activeTab, orderStatusFilter]);
 
+  // Listen to cross-system notes update events
+  useEffect(() => {
+    const handleNotesEvent = () => {
+      if (activeTab === 'notes') {
+        api.getAdminNotes().then((res) => {
+          if (res && res.success && Array.isArray(res.notes)) {
+            setNotes(res.notes);
+          }
+        });
+      }
+    };
+    window.addEventListener('neet_notes_updated', handleNotesEvent);
+    return () => window.removeEventListener('neet_notes_updated', handleNotesEvent);
+  }, [activeTab]);
+
   // Load categories once on mount
   useEffect(() => {
     api.getCategories().then((res) => {
@@ -239,23 +254,22 @@ export const AdminDashboard: React.FC = () => {
         );
 
         const res = await api.updateAdminNote(editingNote.id, formData);
-        if (res && (res.success || res.note)) {
-          showToast('Note updated successfully!');
-          setIsNoteModalOpen(false);
-          setEditingNote(null);
-          loadTabContent();
-        } else {
-          showToast(res?.message || 'Note saved.');
-          setIsNoteModalOpen(false);
-          setEditingNote(null);
-          loadTabContent();
+        showToast(res?.message || 'Study note updated successfully!');
+        setIsNoteModalOpen(false);
+        setEditingNote(null);
+        if (res?.note) {
+          setNotes((prev) => prev.map((n) => Number(n.id) === Number(editingNote.id) ? { ...n, ...res.note } : n));
         }
+        await loadTabContent();
       } else {
         const res = await api.createAdminNote(formData);
         if (res && (res.success || res.noteId || res.note)) {
           showToast('New study note published successfully!');
           setIsNoteModalOpen(false);
-          loadTabContent();
+          if (res.note) {
+            setNotes((prev) => [res.note, ...prev.filter((n) => Number(n.id) !== Number(res.note.id))]);
+          }
+          await loadTabContent();
         } else {
           showToast(res?.message || 'Failed to save note');
         }
@@ -270,23 +284,19 @@ export const AdminDashboard: React.FC = () => {
 
   const confirmDeleteNote = async (id: number) => {
     // Optimistic deletion
-    setNotes((prev) => prev.filter((n) => n.id !== id));
+    setNotes((prev) => prev.filter((n) => Number(n.id) !== Number(id)));
     setDeletingNoteId(null);
-    if (editingNote?.id === id) {
+    if (editingNote && Number(editingNote.id) === Number(id)) {
       setIsNoteModalOpen(false);
       setEditingNote(null);
     }
     try {
       const res = await api.deleteAdminNote(id);
-      if (res && res.success) {
-        showToast('Study note deleted successfully.');
-      } else {
-        showToast('Study note deleted.');
-      }
-      loadTabContent();
+      showToast(res?.message || 'Study note deleted permanently.');
+      await loadTabContent();
     } catch (err) {
       showToast('Study note removed.');
-      loadTabContent();
+      await loadTabContent();
     }
   };
 
@@ -764,6 +774,19 @@ export const AdminDashboard: React.FC = () => {
                   </button>
                 )}
               </div>
+
+              <button
+                id="admin-refresh-notes-btn"
+                onClick={() => {
+                  loadTabContent();
+                  showToast('Notes catalog refreshed.');
+                }}
+                className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                title="Refresh Catalog"
+              >
+                <RefreshCcw className="w-4 h-4" />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
 
               <button
                 id="admin-create-note-btn"

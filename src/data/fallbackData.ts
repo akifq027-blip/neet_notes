@@ -51,14 +51,7 @@ function initStoredNotes(): Note[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        // Strip out any duplicate demo notes (IDs 1 through 20)
-        const cleaned = parsed.filter((n: Note) => n && Number(n.id) > 20);
-        if (cleaned.length !== parsed.length) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-          FALLBACK_NOTES = cleaned;
-          return cleaned;
-        }
+      if (Array.isArray(parsed) && parsed.length > 0) {
         FALLBACK_NOTES = parsed;
         return parsed;
       }
@@ -77,14 +70,7 @@ export function getFallbackNotes(): Note[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        // Filter out legacy demo notes
-        const cleaned = parsed.filter((n: Note) => n && Number(n.id) > 20);
-        if (cleaned.length !== parsed.length) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-          FALLBACK_NOTES = cleaned;
-          return cleaned;
-        }
+      if (Array.isArray(parsed) && parsed.length > 0) {
         FALLBACK_NOTES = parsed;
         return parsed;
       }

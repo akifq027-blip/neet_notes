@@ -465,7 +465,7 @@ export async function getNoteById(req: AuthRequest, res: Response) {
         const pool = getPool();
         if (pool) {
           const [orderRows]: any = await pool.query(
-            'SELECT oi.id FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND oi.note_id = ? AND o.payment_status = "paid"',
+            'SELECT oi.id FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND oi.note_id = ? AND o.payment_status IN ("paid", "pending_verification")',
             [req.user.id, note.id]
           );
           isPurchased = orderRows.length > 0;
@@ -477,10 +477,10 @@ export async function getNoteById(req: AuthRequest, res: Response) {
           inWishlist = wRows.length > 0;
         }
       } else {
-        const paidOrders = memoryStore.orders.filter(o => o.user_id === req.user?.id && o.payment_status === 'paid');
+        const paidOrders = memoryStore.orders.filter(o => o.user_id === req.user?.id && (o.payment_status === 'paid' || o.payment_status === 'pending_verification'));
         const paidOrderIds = paidOrders.map(o => o.id);
-        isPurchased = memoryStore.order_items.some(oi => paidOrderIds.includes(oi.order_id) && oi.note_id === note.id);
-        inWishlist = memoryStore.wishlist.some(w => w.user_id === req.user?.id && w.note_id === note.id);
+        isPurchased = memoryStore.order_items.some(oi => paidOrderIds.includes(oi.order_id) && Number(oi.note_id) === Number(note.id));
+        inWishlist = memoryStore.wishlist.some(w => w.user_id === req.user?.id && Number(w.note_id) === Number(note.id));
       }
     }
 
@@ -582,7 +582,7 @@ export async function downloadNote(req: AuthRequest, res: Response) {
         const pool = getPool();
         if (pool) {
           const [oRows]: any = await pool.query(
-            'SELECT o.id FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND oi.note_id = ? AND o.payment_status = "paid"',
+            'SELECT o.id FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND oi.note_id = ? AND o.payment_status IN ("paid", "pending_verification")',
             [req.user.id, noteId]
           );
           if (oRows.length > 0) {
@@ -591,9 +591,9 @@ export async function downloadNote(req: AuthRequest, res: Response) {
           }
         }
       } else {
-        const paidOrders = memoryStore.orders.filter(o => o.user_id === req.user?.id && o.payment_status === 'paid');
+        const paidOrders = memoryStore.orders.filter(o => o.user_id === req.user?.id && (o.payment_status === 'paid' || o.payment_status === 'pending_verification'));
         const paidOrderIds = paidOrders.map(o => o.id);
-        const item = memoryStore.order_items.find(oi => paidOrderIds.includes(oi.order_id) && oi.note_id === noteId);
+        const item = memoryStore.order_items.find(oi => paidOrderIds.includes(oi.order_id) && Number(oi.note_id) === Number(noteId));
         if (item) {
           isAuthorized = true;
           orderId = item.order_id;
@@ -774,7 +774,7 @@ export async function getReaderContent(req: AuthRequest, res: Response) {
         const pool = getPool();
         if (pool) {
           const [oRows]: any = await pool.query(
-            'SELECT o.id, o.order_number FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND oi.note_id = ? AND o.payment_status = "paid"',
+            'SELECT o.id, o.order_number FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND oi.note_id = ? AND o.payment_status IN ("paid", "pending_verification")',
             [req.user.id, noteId]
           );
           if (oRows.length > 0) {
@@ -784,11 +784,11 @@ export async function getReaderContent(req: AuthRequest, res: Response) {
         }
       } else {
         const paidOrders = memoryStore.orders.filter(
-          (o) => o.user_id === req.user?.id && o.payment_status === 'paid'
+          (o) => o.user_id === req.user?.id && (o.payment_status === 'paid' || o.payment_status === 'pending_verification')
         );
         const paidOrderIds = paidOrders.map((o) => o.id);
         const item = memoryStore.order_items.find(
-          (oi) => paidOrderIds.includes(oi.order_id) && oi.note_id === noteId
+          (oi) => paidOrderIds.includes(oi.order_id) && Number(oi.note_id) === Number(noteId)
         );
         if (item) {
           isAuthorized = true;
@@ -980,30 +980,31 @@ export async function getStudentLibrary(req: AuthRequest, res: Response) {
            JOIN orders o ON oi.order_id = o.id
            JOIN notes n ON oi.note_id = n.id
            LEFT JOIN categories c ON n.category_id = c.id
-           WHERE o.user_id = ? AND o.payment_status = "paid"
+           WHERE o.user_id = ? AND o.payment_status IN ("paid", "pending_verification")
            ORDER BY o.created_at DESC`,
           [req.user.id]
         );
         libraryNotes = rows;
       }
     } else {
-      const paidOrders = memoryStore.orders.filter(o => o.user_id === req.user?.id && o.payment_status === 'paid');
+      const paidOrders = memoryStore.orders.filter(o => o.user_id === req.user?.id && (o.payment_status === 'paid' || o.payment_status === 'pending_verification'));
       const paidOrderIds = paidOrders.map(o => o.id);
       const items = memoryStore.order_items.filter(oi => paidOrderIds.includes(oi.order_id));
       const seenNoteIds = new Set<number>();
 
       items.forEach(item => {
-        if (!seenNoteIds.has(item.note_id)) {
-          seenNoteIds.add(item.note_id);
-          const note = memoryStore.notes.find(n => n.id === item.note_id);
-          const order = memoryStore.orders.find(o => o.id === item.order_id);
+        const noteIdNum = Number(item.note_id);
+        if (!seenNoteIds.has(noteIdNum)) {
+          seenNoteIds.add(noteIdNum);
+          const note = memoryStore.notes.find(n => Number(n.id) === noteIdNum);
+          const order = memoryStore.orders.find(o => Number(o.id) === Number(item.order_id));
           if (note) {
             const cat = memoryStore.categories.find(c => c.id === note.category_id);
             libraryNotes.push({
               ...note,
-              order_number: order?.order_number,
-              purchased_at: order?.created_at,
-              category_name: cat?.name,
+              order_number: order?.order_number || `ORD-${item.order_id}`,
+              purchased_at: order?.created_at || new Date().toISOString(),
+              category_name: cat?.name || 'General',
             });
           }
         }
