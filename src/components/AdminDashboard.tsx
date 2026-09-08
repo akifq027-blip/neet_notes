@@ -23,8 +23,9 @@ import {
   Save,
   Check,
   Clock,
+  HardDrive,
 } from 'lucide-react';
-import { Note, Order, User, Review, Coupon, ContactMessage, RefundRequest, DashboardStats } from '../types';
+import { Note, Order, User, Review, Coupon, ContactMessage, RefundRequest, DashboardStats, Category } from '../types';
 import { api } from '../services/api';
 
 export const AdminDashboard: React.FC = () => {
@@ -40,12 +41,14 @@ export const AdminDashboard: React.FC = () => {
   // Notes
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteSearch, setNoteSearch] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
 
   // Orders
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderStatusFilter, setOrderStatusFilter] = useState('all');
+  const [orderSearch, setOrderSearch] = useState('');
 
   // Users
   const [users, setUsers] = useState<any[]>([]);
@@ -64,26 +67,39 @@ export const AdminDashboard: React.FC = () => {
   const [refunds, setRefunds] = useState<RefundRequest[]>([]);
   const [refundNote, setRefundNote] = useState<{ [id: number]: string }>({});
 
-  // Site Settings
+  // Site Settings & Aiven Database Storage
   const [settings, setSettings] = useState<any>({
-    site_name: 'NEET Notes Marketplace HQ',
+    site_name: 'NCERT NOTES HQ',
     support_email: 'akifquadri5604@gmail.com',
     support_phone: '7989725471',
-    announcement_bar: '🎉 NEET 2026 Aspirants: Use code NEET20 for 20% OFF on all high-yield notes!',
+    announcement_bar: '🎉 NCERT NOTES: Use code NEET20 for 20% OFF on all high-yield notes!',
     maintenance_mode: 'false',
+    allow_pdf_downloads: '0',
   });
+  const [dbStorage, setDbStorage] = useState<any>(null);
+  const [isOptimizingDb, setIsOptimizingDb] = useState(false);
+  const [isCleaningDb, setIsCleaningDb] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [toastMsg, setToastMsg] = useState('');
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(''), 3000);
+    setTimeout(() => setToastMsg(''), 3500);
   };
 
   useEffect(() => {
     loadTabContent();
-  }, [activeTab]);
+  }, [activeTab, orderStatusFilter]);
+
+  // Load categories once on mount
+  useEffect(() => {
+    api.getCategories().then((res) => {
+      if (res?.success && res.categories) {
+        setCategories(res.categories);
+      }
+    }).catch(() => {});
+  }, []);
 
   const loadTabContent = async () => {
     setIsLoading(true);
@@ -118,9 +134,15 @@ export const AdminDashboard: React.FC = () => {
         const res = await api.getAdminRefunds();
         if (res.success) setRefunds(res.refunds);
       } else if (activeTab === 'settings') {
-        const res = await api.getSettings();
-        if (res.success && res.settings) {
-          setSettings((prev: any) => ({ ...prev, ...res.settings }));
+        const [settingsRes, storageRes] = await Promise.all([
+          api.getSettings(),
+          api.getDatabaseStorageInfo(),
+        ]);
+        if (settingsRes?.success && settingsRes.settings) {
+          setSettings((prev: any) => ({ ...prev, ...settingsRes.settings }));
+        }
+        if (storageRes?.success) {
+          setDbStorage(storageRes);
         }
       }
     } catch (err) {
@@ -135,6 +157,31 @@ export const AdminDashboard: React.FC = () => {
     e.preventDefault();
     const form = e.currentTarget;
     const formData = new FormData(form);
+
+    // Clean empty files so Multer does not reject the upload
+    const pdfFile = formData.get('pdf_file') as File | null;
+    if (!pdfFile || !pdfFile.size || pdfFile.size === 0) {
+      formData.delete('pdf_file');
+      if (editingNote?.pdf_file) {
+        formData.set('pdf_url', editingNote.pdf_file);
+      }
+    }
+
+    const previewFile = formData.get('preview_file') as File | null;
+    if (!previewFile || !previewFile.size || previewFile.size === 0) {
+      formData.delete('preview_file');
+      if (editingNote?.preview_file) {
+        formData.set('sample_pdf_url', editingNote.preview_file);
+      }
+    }
+
+    const thumbFile = formData.get('thumbnail') as File | null;
+    if (!thumbFile || !thumbFile.size || thumbFile.size === 0) {
+      formData.delete('thumbnail');
+      if (editingNote?.thumbnail && !formData.get('thumbnail_url')) {
+        formData.set('thumbnail_url', editingNote.thumbnail);
+      }
+    }
 
     // Explicitly handle checkbox booleans
     const isFreeEl = form.elements.namedItem('is_free') as HTMLInputElement | null;
@@ -154,6 +201,7 @@ export const AdminDashboard: React.FC = () => {
         const updatedExam = (formData.get('exam') as string) || editingNote.exam || 'NEET';
         const updatedResourceType = (formData.get('resource_type') as string) || editingNote.resource_type || 'Notes';
         const updatedChapter = (formData.get('chapter') as string) || editingNote.chapter;
+        const updatedCategoryId = parseInt((formData.get('category_id') as string) || String(editingNote.category_id || 1), 10);
         const updatedPrice = parseFloat((formData.get('price') as string) || String(editingNote.price));
         const updatedOrigPrice = parseFloat((formData.get('original_price') as string) || String(editingNote.original_price));
         const updatedTotalPages = parseInt((formData.get('total_pages') as string) || String(editingNote.total_pages), 10);
@@ -175,6 +223,7 @@ export const AdminDashboard: React.FC = () => {
                   exam: updatedExam as any,
                   resource_type: updatedResourceType as any,
                   chapter: updatedChapter,
+                  category_id: updatedCategoryId,
                   price: updatedPrice,
                   original_price: updatedOrigPrice,
                   total_pages: updatedTotalPages,
@@ -196,7 +245,7 @@ export const AdminDashboard: React.FC = () => {
           setEditingNote(null);
           loadTabContent();
         } else {
-          showToast(res.message || 'Note saved.');
+          showToast(res?.message || 'Note saved.');
           setIsNoteModalOpen(false);
           setEditingNote(null);
           loadTabContent();
@@ -208,7 +257,7 @@ export const AdminDashboard: React.FC = () => {
           setIsNoteModalOpen(false);
           loadTabContent();
         } else {
-          showToast(res.message || 'Failed to save note');
+          showToast(res?.message || 'Failed to save note');
         }
       }
     } catch (err: any) {
@@ -394,6 +443,38 @@ export const AdminDashboard: React.FC = () => {
       loadTabContent();
     } catch (err) {
       showToast('Failed to save settings');
+    }
+  };
+
+  const handleOptimizeDatabase = async () => {
+    setIsOptimizingDb(true);
+    try {
+      const res = await api.optimizeDatabase();
+      showToast(res?.message || 'MySQL database optimized and disk space reclaimed!');
+      const storageRes = await api.getDatabaseStorageInfo();
+      if (storageRes?.success) setDbStorage(storageRes);
+    } catch (err: any) {
+      showToast('Database optimization failed: ' + (err.message || 'Error'));
+    } finally {
+      setIsOptimizingDb(false);
+    }
+  };
+
+  const handleCleanTestData = async () => {
+    if (!window.confirm('Purge test transactions, sample contacts, and run database defragmentation? This safely cleans space on your 1 GB Aiven MySQL instance.')) {
+      return;
+    }
+    setIsCleaningDb(true);
+    try {
+      const res = await api.cleanTestData();
+      showToast(res?.message || 'Test data purged and space optimized!');
+      const storageRes = await api.getDatabaseStorageInfo();
+      if (storageRes?.success) setDbStorage(storageRes);
+      loadTabContent();
+    } catch (err: any) {
+      showToast('Cleanup failed: ' + (err.message || 'Error'));
+    } finally {
+      setIsCleaningDb(false);
     }
   };
 
@@ -919,6 +1000,32 @@ export const AdminDashboard: React.FC = () => {
                 </div>
 
                 <div>
+                  <label className="block font-bold text-slate-700 mb-1">Marketplace Category</label>
+                  <select
+                    name="category_id"
+                    defaultValue={editingNote?.category_id || 1}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none font-medium"
+                  >
+                    {categories.length > 0 ? (
+                      categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="1">Complete Subject Bundles</option>
+                        <option value="2">NCERT Line-by-Line Notes</option>
+                        <option value="3">Revision Notes & Mindmaps</option>
+                        <option value="4">Previous Year Questions (PYQs)</option>
+                        <option value="5">Formula Sheets & Cheat Codes</option>
+                        <option value="6">Mock Test Papers</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                <div>
                   <label className="block font-bold text-slate-700 mb-1">Chapter Name</label>
                   <input
                     name="chapter"
@@ -986,33 +1093,67 @@ export const AdminDashboard: React.FC = () => {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block font-bold text-slate-700 mb-1">Thumbnail Image URL (or file)</label>
-                  <input
-                    name="thumbnail_url"
-                    defaultValue={editingNote?.thumbnail || 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=80'}
-                    placeholder="https://..."
-                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none"
-                  />
+                  <label className="block font-bold text-slate-700 mb-1">Thumbnail Cover Image</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block mb-1 font-medium">Cover Image URL</span>
+                      <input
+                        name="thumbnail_url"
+                        defaultValue={editingNote?.thumbnail || 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=80'}
+                        placeholder="https://..."
+                        className="w-full p-2 text-xs rounded-xl border border-slate-200 focus:border-emerald-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block mb-1 font-medium">Or Upload Image File</span>
+                      <input
+                        name="thumbnail"
+                        type="file"
+                        accept="image/*"
+                        className="w-full p-1.5 text-xs border border-slate-200 rounded-xl bg-white"
+                      />
+                    </div>
+                  </div>
+                  {editingNote?.thumbnail && (
+                    <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
+                      <span className="font-semibold text-slate-700">Current Cover:</span>
+                      <img src={editingNote.thumbnail} alt="" className="w-7 h-9 object-cover rounded shadow-xs border border-slate-200" />
+                    </div>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Upload PDF File (Multer)</label>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Upload PDF File {editingNote ? '(Leave blank to keep existing)' : '(Multer)'}
+                  </label>
                   <input
                     name="pdf_file"
                     type="file"
                     accept=".pdf"
-                    className="w-full p-2 text-xs border border-slate-200 rounded-xl"
+                    className="w-full p-2 text-xs border border-slate-200 rounded-xl bg-white"
                   />
+                  {editingNote?.pdf_file && (
+                    <p className="text-[11px] text-emerald-700 font-medium mt-1 truncate">
+                      Current: {editingNote.pdf_file}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Upload Preview Sample (Optional)</label>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Upload Preview Sample {editingNote ? '(Leave blank to keep existing)' : '(Optional)'}
+                  </label>
                   <input
                     name="preview_file"
                     type="file"
-                    accept=".pdf,.png,.jpg"
-                    className="w-full p-2 text-xs border border-slate-200 rounded-xl"
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    className="w-full p-2 text-xs border border-slate-200 rounded-xl bg-white"
                   />
+                  {editingNote?.preview_file && (
+                    <p className="text-[11px] text-slate-500 font-medium mt-1 truncate">
+                      Current: {editingNote.preview_file}
+                    </p>
+                  )}
                 </div>
 
                 <div className="sm:col-span-2 flex flex-wrap gap-4 pt-2">
@@ -1121,20 +1262,33 @@ export const AdminDashboard: React.FC = () => {
               <p className="text-xs text-slate-500">Real-time status of student transactions and manual UPI verifications.</p>
             </div>
 
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-500 font-bold">Filter Status:</span>
-              <select
-                value={orderStatusFilter}
-                onChange={(e) => setOrderStatusFilter(e.target.value)}
-                className="p-2 border border-slate-200 rounded-xl bg-white font-medium"
-              >
-                <option value="all">All Statuses</option>
-                <option value="pending_verification">Pending Verification</option>
-                <option value="paid">Paid</option>
-                <option value="rejected">Rejected</option>
-                <option value="pending">Pending</option>
-                <option value="refunded">Refunded</option>
-              </select>
+            <div className="flex flex-wrap items-center gap-2.5 text-xs w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-56">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  placeholder="Search order #, student, UTR..."
+                  className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl bg-white font-medium outline-none focus:border-emerald-500 text-xs"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-500 font-bold whitespace-nowrap">Status:</span>
+                <select
+                  value={orderStatusFilter}
+                  onChange={(e) => setOrderStatusFilter(e.target.value)}
+                  className="p-2 border border-slate-200 rounded-xl bg-white font-medium outline-none text-xs"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="pending_verification">Pending Verification</option>
+                  <option value="paid">Paid</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="pending">Pending</option>
+                  <option value="refunded">Refunded</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -1153,7 +1307,18 @@ export const AdminDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {orders.map((ord) => (
+                {orders
+                  .filter((ord) => {
+                    if (!orderSearch.trim()) return true;
+                    const q = orderSearch.toLowerCase();
+                    return (
+                      ord.order_number?.toLowerCase().includes(q) ||
+                      ord.customer_name?.toLowerCase().includes(q) ||
+                      ord.customer_email?.toLowerCase().includes(q) ||
+                      ord.transaction_id?.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((ord) => (
                   <tr key={ord.id} className="hover:bg-slate-50/70">
                     <td className="p-4 font-mono font-bold text-slate-900">{ord.order_number}</td>
                     <td className="p-4">
@@ -1260,9 +1425,22 @@ export const AdminDashboard: React.FC = () => {
       {/* Tab 4: Students Management */}
       {activeTab === 'users' && (
         <div className="space-y-6">
-          <div>
-            <h2 className="text-lg font-black text-slate-900">Registered Students Directory</h2>
-            <p className="text-xs text-slate-500">Student accounts, lifetime spend, and status controls.</p>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-black text-slate-900">Registered Students Directory</h2>
+              <p className="text-xs text-slate-500">Student accounts, lifetime spend, and status controls.</p>
+            </div>
+
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                placeholder="Search student name, email, phone..."
+                className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl bg-white font-medium outline-none focus:border-emerald-500 text-xs"
+              />
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
@@ -1278,7 +1456,17 @@ export const AdminDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {users.map((u) => (
+                {users
+                  .filter((u) => {
+                    if (!userSearch.trim()) return true;
+                    const q = userSearch.toLowerCase();
+                    return (
+                      u.name?.toLowerCase().includes(q) ||
+                      u.email?.toLowerCase().includes(q) ||
+                      u.phone?.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((u) => (
                   <tr key={u.id} className="hover:bg-slate-50/70">
                     <td className="p-4">
                       <div className="font-bold text-slate-900">{u.name}</div>
@@ -1614,131 +1802,266 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 9: Site Settings */}
+      {/* Tab 9: Site Settings & Database Maintenance */}
       {activeTab === 'settings' && (
-        <div className="max-w-2xl bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
-          <div>
-            <h2 className="text-lg font-black text-slate-900">Platform Configuration & Controls</h2>
-            <p className="text-xs text-slate-500">Configure global announcements and support contact info.</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          {/* Platform Settings Form */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+            <div>
+              <h2 className="text-lg font-black text-slate-900">Platform Configuration & Controls</h2>
+              <p className="text-xs text-slate-500">Configure global announcements, contact details, and protection mode.</p>
+            </div>
+
+            <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Marketplace Platform Name</label>
+                <input
+                  type="text"
+                  value={settings.site_name || ''}
+                  onChange={(e) => setSettings({ ...settings, site_name: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Top Announcement Banner Text</label>
+                <input
+                  type="text"
+                  value={settings.announcement_bar || ''}
+                  onChange={(e) => setSettings({ ...settings, announcement_bar: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Direct Support Email</label>
+                <input
+                  type="email"
+                  value={settings.support_email || ''}
+                  onChange={(e) => setSettings({ ...settings, support_email: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">WhatsApp Direct Support Number (Hidden Redirect)</label>
+                <p className="text-xs text-slate-500 mb-1.5 font-medium">
+                  This number powers instant 1-click WhatsApp redirects for students without exposing your raw phone number publicly.
+                </p>
+                <input
+                  type="text"
+                  value={settings.support_phone || ''}
+                  onChange={(e) => setSettings({ ...settings, support_phone: e.target.value })}
+                  placeholder="7989725471"
+                  className="w-full p-2.5 rounded-xl border border-slate-200 outline-none"
+                />
+              </div>
+
+              {/* Content Delivery & Anti-Piracy Protection Mode Toggle */}
+              <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                  <label className="font-black text-slate-900 text-xs uppercase tracking-wide">
+                    Content Delivery & Anti-Piracy Protection Mode
+                  </label>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Choose how students access their purchased notes. With &quot;Online Reading Only&quot;, direct PDF downloads are locked. Students view notes exclusively inside the secure, full-screen in-app reader protected with student-specific dynamic watermarks and screenshot interception.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <label
+                    className={`p-3.5 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
+                      (settings.allow_pdf_downloads ?? '0') === '0'
+                        ? 'bg-white border-emerald-600 shadow-xs'
+                        : 'bg-white/60 border-slate-200 opacity-75 hover:opacity-100'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="allow_pdf_downloads"
+                      value="0"
+                      checked={(settings.allow_pdf_downloads ?? '0') === '0'}
+                      onChange={() => setSettings({ ...settings, allow_pdf_downloads: '0' })}
+                      className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                        <span>Online Reading Only</span>
+                        <span className="bg-emerald-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded">RECOMMENDED</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                        Disables direct PDF downloads. Students read in the in-app reader with dynamic watermarking (Name, Email, Phone, Order ID).
+                      </p>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`p-3.5 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
+                      settings.allow_pdf_downloads === '1'
+                        ? 'bg-white border-emerald-600 shadow-xs'
+                        : 'bg-white/60 border-slate-200 opacity-75 hover:opacity-100'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="allow_pdf_downloads"
+                      value="1"
+                      checked={settings.allow_pdf_downloads === '1'}
+                      onChange={() => setSettings({ ...settings, allow_pdf_downloads: '1' })}
+                      className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-900 text-xs">Allow PDF Downloads</div>
+                      <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                        Allows students to download the original raw PDF files alongside the In-App Reader.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl flex items-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save System Settings</span>
+              </button>
+            </form>
           </div>
 
-          <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Marketplace Platform Name</label>
-              <input
-                type="text"
-                value={settings.site_name || ''}
-                onChange={(e) => setSettings({ ...settings, site_name: e.target.value })}
-                className="w-full p-2.5 rounded-xl border border-slate-200 outline-none"
-              />
-            </div>
+          {/* Aiven MySQL Database & Storage Manager */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+                  <HardDrive className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">Aiven MySQL Storage Manager</h2>
+                  <p className="text-xs text-slate-500">Live storage monitoring for your 1 GB tier & table defragmentation.</p>
+                </div>
+              </div>
 
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Top Announcement Banner Text</label>
-              <input
-                type="text"
-                value={settings.announcement_bar || ''}
-                onChange={(e) => setSettings({ ...settings, announcement_bar: e.target.value })}
-                className="w-full p-2.5 rounded-xl border border-slate-200 outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Direct Support Email</label>
-              <input
-                type="email"
-                value={settings.support_email || ''}
-                onChange={(e) => setSettings({ ...settings, support_email: e.target.value })}
-                className="w-full p-2.5 rounded-xl border border-slate-200 outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">WhatsApp Direct Support Number (Hidden Redirect)</label>
-              <p className="text-xs text-slate-500 mb-1.5 font-medium">
-                This number powers instant 1-click WhatsApp redirects for students without exposing your raw phone number publicly.
-              </p>
-              <input
-                type="text"
-                value={settings.support_phone || ''}
-                onChange={(e) => setSettings({ ...settings, support_phone: e.target.value })}
-                placeholder="7989725471"
-                className="w-full p-2.5 rounded-xl border border-slate-200 outline-none"
-              />
-            </div>
-
-            {/* Content Delivery & Anti-Piracy Protection Mode Toggle */}
-            <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-3">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                <label className="font-black text-slate-900 text-xs uppercase tracking-wide">
-                  Content Delivery & Anti-Piracy Protection Mode
-                </label>
-              </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Choose how students access their purchased notes. With &quot;Online Reading Only&quot;, direct PDF downloads are locked. Students view notes exclusively inside the secure, full-screen in-app reader protected with student-specific dynamic watermarks and screenshot interception.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <label
-                  className={`p-3.5 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
-                    (settings.allow_pdf_downloads ?? '0') === '0'
-                      ? 'bg-white border-emerald-600 shadow-xs'
-                      : 'bg-white/60 border-slate-200 opacity-75 hover:opacity-100'
-                  }`}
+                <button
+                  type="button"
+                  disabled={isOptimizingDb}
+                  onClick={handleOptimizeDatabase}
+                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                  title="Run OPTIMIZE TABLE on all MySQL tables to reclaim fragmented disk space"
                 >
-                  <input
-                    type="radio"
-                    name="allow_pdf_downloads"
-                    value="0"
-                    checked={(settings.allow_pdf_downloads ?? '0') === '0'}
-                    onChange={() => setSettings({ ...settings, allow_pdf_downloads: '0' })}
-                    className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <div>
-                    <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                      <span>Online Reading Only</span>
-                      <span className="bg-emerald-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded">RECOMMENDED</span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-1 leading-snug">
-                      Disables direct PDF downloads. Students read in the in-app reader with dynamic watermarking (Name, Email, Phone, Order ID).
-                    </p>
-                  </div>
-                </label>
-
-                <label
-                  className={`p-3.5 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
-                    settings.allow_pdf_downloads === '1'
-                      ? 'bg-white border-emerald-600 shadow-xs'
-                      : 'bg-white/60 border-slate-200 opacity-75 hover:opacity-100'
-                  }`}
+                  <RefreshCcw className={`w-3.5 h-3.5 ${isOptimizingDb ? 'animate-spin' : ''}`} />
+                  <span>{isOptimizingDb ? 'Optimizing...' : 'Optimize & Reclaim'}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={isCleaningDb}
+                  onClick={handleCleanTestData}
+                  className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+                  title="Purge test orders, test contacts, and reclaim database storage"
                 >
-                  <input
-                    type="radio"
-                    name="allow_pdf_downloads"
-                    value="1"
-                    checked={settings.allow_pdf_downloads === '1'}
-                    onChange={() => setSettings({ ...settings, allow_pdf_downloads: '1' })}
-                    className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <div>
-                    <div className="font-bold text-slate-900 text-xs">Allow PDF Downloads</div>
-                    <p className="text-[11px] text-slate-500 mt-1 leading-snug">
-                      Allows students to download the original raw PDF files alongside the In-App Reader.
-                    </p>
-                  </div>
-                </label>
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isCleaningDb ? 'Cleaning...' : 'Purge Test Data'}</span>
+                </button>
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl flex items-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer"
-            >
-              <Save className="w-4 h-4" />
-              <span>Save System Settings</span>
-            </button>
-          </form>
+            {/* Storage Progress Gauge */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+              <div className="flex justify-between items-center text-xs font-bold">
+                <span className="text-slate-800 flex items-center gap-1.5">
+                  <Database className="w-4 h-4 text-slate-500" />
+                  Total Storage Used: <span className="font-mono text-slate-900">{dbStorage?.total_size_mb ?? 0.12} MB</span> / 1024 MB
+                </span>
+                <span className="text-emerald-700 font-black bg-emerald-100/80 px-2 py-0.5 rounded text-[11px]">
+                  {dbStorage?.storage_used_percent ?? 0.01}% Used
+                </span>
+              </div>
+
+              <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-emerald-600 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.max(1, Math.min(100, (dbStorage?.storage_used_percent || 0.01) * 8))}%` }}
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-slate-500 gap-1 pt-1">
+                <span>Free Space Available: <strong className="text-slate-700">~{1024 - (dbStorage?.total_size_mb || 0.12)} MB</strong></span>
+                {dbStorage?.reclaimable_space_mb ? (
+                  <span className="text-amber-600 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    {dbStorage.reclaimable_space_mb} MB reclaimable via optimization
+                  </span>
+                ) : (
+                  <span className="text-emerald-600 font-medium flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Tables defragmented
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Storage optimization instructions */}
+            <div className="p-3.5 bg-blue-50/50 border border-blue-100 rounded-xl text-xs text-blue-900 space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-blue-700" />
+                <span>How 1 GB Aiven MySQL Storage Management Works</span>
+              </div>
+              <p className="text-[11px] text-blue-800 leading-relaxed">
+                When notes, orders, or contacts are deleted, MySQL marks space as free inside the InnoDB tablespace instead of shrinking files immediately. Clicking <strong>&quot;Optimize & Reclaim&quot;</strong> executes an <code className="bg-blue-100 px-1 py-0.2 rounded font-mono text-[10px]">OPTIMIZE TABLE</code> command to defragment tables and return space to your Aiven allocation.
+              </p>
+            </div>
+
+            {/* Table breakdown */}
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 mb-2 uppercase tracking-wider">MySQL Table Breakdown</h3>
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="p-2.5">Table</th>
+                      <th className="p-2.5 text-center">Rows</th>
+                      <th className="p-2.5 text-right">Size</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {dbStorage?.tables && dbStorage.tables.length > 0 ? (
+                      dbStorage.tables.map((tbl: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-slate-50/50">
+                          <td className="p-2.5 font-mono text-[11px] text-slate-800">{tbl.table_name}</td>
+                          <td className="p-2.5 text-center">{tbl.table_rows || 0}</td>
+                          <td className="p-2.5 text-right font-semibold text-slate-900">{tbl.size_mb || 0} MB</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="p-2.5 font-mono text-[11px]">notes</td>
+                          <td className="p-2.5 text-center">{notes.length || 0}</td>
+                          <td className="p-2.5 text-right font-semibold">0.05 MB</td>
+                        </tr>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="p-2.5 font-mono text-[11px]">orders & items</td>
+                          <td className="p-2.5 text-center">{orders.length || 0}</td>
+                          <td className="p-2.5 text-right font-semibold">0.03 MB</td>
+                        </tr>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="p-2.5 font-mono text-[11px]">users</td>
+                          <td className="p-2.5 text-center">{users.length || 0}</td>
+                          <td className="p-2.5 text-right font-semibold">0.02 MB</td>
+                        </tr>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="p-2.5 font-mono text-[11px]">reviews & coupons</td>
+                          <td className="p-2.5 text-center">{(reviews.length + coupons.length) || 0}</td>
+                          <td className="p-2.5 text-right font-semibold">0.02 MB</td>
+                        </tr>
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

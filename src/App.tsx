@@ -134,10 +134,13 @@ export function App() {
     };
   }, []);
 
-  // Re-fetch notes on filter change
+  // Re-fetch notes on filter or search change (with 250ms debounce for typing)
   useEffect(() => {
-    fetchNotesList();
-  }, [selectedClass, selectedSubject, selectedResourceType, selectedExam, sortBy, freeOnly]);
+    const timer = setTimeout(() => {
+      fetchNotesList();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [selectedClass, selectedSubject, selectedResourceType, selectedExam, sortBy, freeOnly, searchQuery, currentView]);
 
   const fetchNotesList = async () => {
     setIsLoadingNotes(true);

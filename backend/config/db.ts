@@ -6,11 +6,20 @@ import fs from 'fs';
 
 dotenv.config();
 
-const DB_HOST = process.env.DB_HOST || 'localhost';
-const DB_USER = process.env.DB_USER || 'root';
-const DB_PASSWORD = process.env.DB_PASSWORD || '';
-const DB_NAME = process.env.DB_NAME || 'neet_notes_db';
-const DB_PORT = parseInt(process.env.DB_PORT || '3306', 10);
+const cleanEnvStr = (val: string | undefined, fallback: string): string => {
+  if (!val) return fallback;
+  const trimmed = val.trim();
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+};
+
+const DB_HOST = cleanEnvStr(process.env.DB_HOST, 'localhost');
+const DB_USER = cleanEnvStr(process.env.DB_USER, 'root');
+const DB_PASSWORD = cleanEnvStr(process.env.DB_PASSWORD, '');
+const DB_NAME = cleanEnvStr(process.env.DB_NAME, 'neet_notes_db');
+const DB_PORT = parseInt(cleanEnvStr(process.env.DB_PORT, '3306'), 10) || 3306;
 
 let pool: mysql.Pool | null = null;
 let isUsingMySQL = false;

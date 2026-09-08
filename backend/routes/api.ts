@@ -97,4 +97,9 @@ router.put('/admin/refunds/:id', requireAdmin, adminCtrl.handleRefundDecision);
 // Admin Settings
 router.post('/admin/settings', requireAdmin, adminCtrl.updateSettings);
 
+// Admin Database Storage & Maintenance (Aiven 1GB management)
+router.get('/admin/database/storage', requireAdmin, adminCtrl.getDatabaseStorageInfo);
+router.post('/admin/database/optimize', requireAdmin, adminCtrl.optimizeDatabase);
+router.post('/admin/database/clean-test-data', requireAdmin, adminCtrl.cleanTestData);
+
 export default router;
