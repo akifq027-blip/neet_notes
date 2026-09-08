@@ -1,5 +1,5 @@
 import { Note, Category, User, Order, Review, Coupon, ContactMessage, RefundRequest, DashboardStats, SiteSettings, SecureReaderData } from '../types';
-import { FALLBACK_NOTES, FALLBACK_CATEGORIES, getFallbackNotes, removeFallbackNote, addFallbackNote, updateFallbackNote } from '../data/fallbackData';
+import { FALLBACK_CATEGORIES, getFallbackNotes, removeFallbackNote, addFallbackNote, updateFallbackNote } from '../data/fallbackData';
 
 // Support custom API URL if deployed separately (e.g. VITE_API_URL or default /api)
 const API_BASE = (typeof import.meta !== 'undefined' && ((import.meta as any).env?.VITE_API_URL || (import.meta as any).env?.VITE_API_BASE_URL)) || '/api';
@@ -473,8 +473,22 @@ export const api = {
       return result;
     }
 
-    const note = FALLBACK_NOTES.find(n => String(n.id) === String(id)) || FALLBACK_NOTES[0];
-    const relatedNotes = FALLBACK_NOTES.filter(n => n.id !== note.id && n.subject === note.subject).slice(0, 3);
+    const currentNotes = getFallbackNotes();
+    const note = currentNotes.find(n => String(n.id) === String(id)) || currentNotes[0];
+
+    if (!note) {
+      return {
+        success: false,
+        note: null as any,
+        isPurchased: false,
+        inWishlist: false,
+        reviews: [],
+        relatedNotes: [],
+        message: 'Note not found',
+      };
+    }
+
+    const relatedNotes = currentNotes.filter(n => n.id !== note.id && n.subject === note.subject).slice(0, 3);
 
     const fallbackReviews: Review[] = [
       {
@@ -524,7 +538,18 @@ export const api = {
       return result;
     }
 
-    const note = FALLBACK_NOTES.find(n => n.id === id) || FALLBACK_NOTES[0];
+    const currentNotes = getFallbackNotes();
+    const note = currentNotes.find(n => n.id === id) || currentNotes[0];
+    if (!note) {
+      return {
+        success: false,
+        noteId: id,
+        title: 'Note not found',
+        previewPages: 0,
+        totalPages: 0,
+        previewSamples: [],
+      };
+    }
     return {
       success: true,
       noteId: note.id,
@@ -1091,20 +1116,21 @@ export const api = {
       headers: getAuthHeaders(),
     });
     if (result && result.success) return result;
+    const currentNotes = getFallbackNotes();
     return {
       success: true,
       stats: {
         totalStudents: 1420,
-        totalNotes: FALLBACK_NOTES.length,
-        freeNotes: FALLBACK_NOTES.filter(n => n.is_free === 1).length,
-        paidNotes: FALLBACK_NOTES.filter(n => n.is_free === 0).length,
+        totalNotes: currentNotes.length,
+        freeNotes: currentNotes.filter(n => n.is_free === 1).length,
+        paidNotes: currentNotes.filter(n => n.is_free === 0).length,
         totalOrders: 284,
         paidOrders: 270,
         totalRevenue: 48590,
         totalDownloads: 4820,
       },
       recentOrders: [],
-      topNotes: FALLBACK_NOTES.slice(0, 5),
+      topNotes: currentNotes.slice(0, 5),
       subjectStats: [
         { subject: 'Biology', totalRevenue: 28400, orderCount: 165 },
         { subject: 'Physics', totalRevenue: 12300, orderCount: 78 },
