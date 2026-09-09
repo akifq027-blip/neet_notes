@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { memoryStore, getPool, isMySQLConnected } from '../config/db';
+import { memoryStore, getPool, isMySQLConnected, saveStoreToFile } from '../config/db';
 import { AuthRequest } from '../middleware/auth';
 
 export async function addReview(req: AuthRequest, res: Response) {
@@ -112,6 +112,7 @@ export async function addReview(req: AuthRequest, res: Response) {
         note.rating_avg = parseFloat(avg.toFixed(2));
         note.rating_count = noteReviews.length;
       }
+      saveStoreToFile();
     }
 
     return res.json({

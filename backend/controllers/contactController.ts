@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { memoryStore, getPool, isMySQLConnected } from '../config/db';
+import { memoryStore, getPool, isMySQLConnected, saveStoreToFile } from '../config/db';
 import { AuthRequest } from '../middleware/auth';
 
 export async function submitContact(req: Request, res: Response) {
@@ -29,6 +29,7 @@ export async function submitContact(req: Request, res: Response) {
         reply: null,
         created_at: new Date().toISOString(),
       });
+      saveStoreToFile();
     }
 
     return res.json({
@@ -70,6 +71,7 @@ export async function submitRefundRequest(req: AuthRequest, res: Response) {
         status: 'pending',
         created_at: new Date().toISOString(),
       });
+      saveStoreToFile();
     }
 
     return res.json({

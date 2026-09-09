@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { memoryStore, getPool, isMySQLConnected } from '../config/db';
+import { memoryStore, getPool, isMySQLConnected, saveStoreToFile } from '../config/db';
 import { generateToken, AuthRequest } from '../middleware/auth';
 
 export async function register(req: Request, res: Response) {
@@ -105,6 +105,7 @@ export async function register(req: Request, res: Response) {
     };
 
     memoryStore.users.push(newUser);
+    saveStoreToFile();
     const token = generateToken({ id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role });
 
     return res.status(201).json({
@@ -447,6 +448,7 @@ export async function updateProfile(req: AuthRequest, res: Response) {
 
       if (name) user.name = name.trim();
       if (phone !== undefined) user.phone = phone;
+      saveStoreToFile();
     }
 
     return res.json({

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { memoryStore, getPool, isMySQLConnected, getDatabaseStatus } from '../config/db';
+import { memoryStore, getPool, isMySQLConnected, getDatabaseStatus, saveStoreToFile } from '../config/db';
 import { AuthRequest } from '../middleware/auth';
 
 // 1. DASHBOARD ANALYTICS
@@ -336,6 +336,7 @@ export async function createAdminNote(req: Request, res: Response) {
     };
 
     memoryStore.notes.unshift(newNote);
+    saveStoreToFile();
 
     return res.status(201).json({
       success: true,
@@ -525,6 +526,7 @@ export async function updateAdminNote(req: Request, res: Response) {
     if (files?.['preview_file']?.[0]) note.preview_file = files['preview_file'][0].filename;
     if (files?.['thumbnail']?.[0]) note.thumbnail = `/backend/uploads/thumbnails/${files['thumbnail'][0].filename}`;
 
+    saveStoreToFile();
     return res.json({ success: true, message: 'Note updated successfully!', note });
   } catch (error: any) {
     console.error('[Update Note Error]', error);
@@ -554,6 +556,7 @@ export async function deleteAdminNote(req: Request, res: Response) {
     const idx = memoryStore.notes.findIndex(n => Number(n.id) === Number(noteId));
     if (idx >= 0) {
       memoryStore.notes.splice(idx, 1);
+      saveStoreToFile();
     }
 
     return res.json({ success: true, message: 'Note deleted permanently from database.' });
@@ -695,6 +698,7 @@ export async function updateOrderStatus(req: Request, res: Response) {
           if (cp) cp.times_used = (cp.times_used || 0) + 1;
         }
       }
+      saveStoreToFile();
     }
 
     return res.json({
@@ -763,7 +767,10 @@ export async function toggleUserStatus(req: Request, res: Response) {
     }
 
     const user = memoryStore.users.find(u => u.id === userId);
-    if (user) user.status = status;
+    if (user) {
+      user.status = status;
+      saveStoreToFile();
+    }
 
     return res.json({ success: true, message: `User status changed to ${status}.` });
   } catch (error) {
@@ -820,7 +827,10 @@ export async function updateReviewStatus(req: Request, res: Response) {
     }
 
     const review = memoryStore.reviews.find(r => r.id === reviewId);
-    if (review) review.status = status;
+    if (review) {
+      review.status = status;
+      saveStoreToFile();
+    }
 
     return res.json({ success: true, message: `Review marked as ${status}.` });
   } catch (error) {
@@ -841,7 +851,10 @@ export async function deleteReview(req: Request, res: Response) {
     }
 
     const idx = memoryStore.reviews.findIndex(r => r.id === reviewId);
-    if (idx >= 0) memoryStore.reviews.splice(idx, 1);
+    if (idx >= 0) {
+      memoryStore.reviews.splice(idx, 1);
+      saveStoreToFile();
+    }
 
     return res.json({ success: true, message: 'Review deleted.' });
   } catch (error) {
@@ -910,6 +923,7 @@ export async function createAdminCoupon(req: Request, res: Response) {
       created_at: new Date().toISOString(),
     };
     memoryStore.coupons.unshift(newCoupon);
+    saveStoreToFile();
 
     return res.status(201).json({ success: true, message: 'Coupon created successfully!', coupon: newCoupon });
   } catch (error: any) {
@@ -929,7 +943,10 @@ export async function deleteAdminCoupon(req: Request, res: Response) {
       }
     }
     const idx = memoryStore.coupons.findIndex(c => c.id === couponId);
-    if (idx >= 0) memoryStore.coupons.splice(idx, 1);
+    if (idx >= 0) {
+      memoryStore.coupons.splice(idx, 1);
+      saveStoreToFile();
+    }
     return res.json({ success: true, message: 'Coupon deleted.' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to delete coupon' });
@@ -970,6 +987,7 @@ export async function replyContact(req: Request, res: Response) {
       contact.reply = reply;
       contact.is_read = 1;
       contact.replied_at = new Date().toISOString();
+      saveStoreToFile();
     }
 
     return res.json({ success: true, message: 'Reply recorded and email dispatched.' });
@@ -1047,6 +1065,7 @@ export async function handleRefundDecision(req: Request, res: Response) {
         const ord = memoryStore.orders.find(o => o.id === refund.order_id);
         if (ord) ord.payment_status = 'refunded';
       }
+      saveStoreToFile();
     }
 
     return res.json({ success: true, message: `Refund request ${status}.` });
@@ -1093,6 +1112,7 @@ export async function updateSettings(req: Request, res: Response) {
     
     if (settings) {
       Object.assign(memoryStore.site_settings, settings);
+      saveStoreToFile();
     }
 
     return res.json({ success: true, message: 'Site configuration updated successfully.' });
@@ -1212,6 +1232,7 @@ export async function cleanTestData(req: Request, res: Response) {
     // In-memory cleanup
     memoryStore.orders = memoryStore.orders.filter(o => !o.customer_email?.includes('test') && !o.customer_name?.includes('Test'));
     memoryStore.contacts = memoryStore.contacts.filter(c => !c.email.includes('test'));
+    saveStoreToFile();
 
     return res.json({
       success: true,

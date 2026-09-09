@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { memoryStore, getPool, isMySQLConnected } from '../config/db';
+import { memoryStore, getPool, isMySQLConnected, saveStoreToFile } from '../config/db';
 import { getRazorpayClient, getRazorpayPublicKey, verifyPaymentSignature, isRazorpayConfigured } from '../config/razorpay';
 import { AuthRequest } from '../middleware/auth';
 
@@ -175,6 +175,7 @@ export async function createCheckoutOrder(req: AuthRequest, res: Response) {
           });
           note.purchase_count = (note.purchase_count || 0) + 1;
         });
+        saveStoreToFile();
       }
 
       return res.json({
@@ -271,6 +272,7 @@ export async function createCheckoutOrder(req: AuthRequest, res: Response) {
           created_at: new Date().toISOString(),
         });
       });
+      saveStoreToFile();
     }
 
     const merchantUpiId = process.env.MERCHANT_UPI_ID || 'akifq027-1@okhdfcbank';
@@ -419,6 +421,7 @@ export async function verifyUpiPayment(req: AuthRequest, res: Response) {
           }
         }
       }
+      saveStoreToFile();
     }
 
     // Return masked UTR for privacy

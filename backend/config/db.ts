@@ -21,11 +21,14 @@ const DB_PASSWORD = cleanEnvStr(process.env.DB_PASSWORD, '');
 const DB_NAME = cleanEnvStr(process.env.DB_NAME, 'neet_notes_db');
 const DB_PORT = parseInt(cleanEnvStr(process.env.DB_PORT, '3306'), 10) || 3306;
 
+const STORE_DIR = path.join(process.cwd(), 'backend', 'data');
+const STORE_FILE = path.join(STORE_DIR, 'store.json');
+
 let pool: mysql.Pool | null = null;
 let isUsingMySQL = false;
 let dbErrorNotice = '';
 
-// Unified In-memory relational store
+// Unified In-memory & JSON file relational store
 export const memoryStore = {
   users: [] as any[],
   categories: [] as any[],
@@ -54,8 +57,20 @@ export const memoryStore = {
   } as Record<string, number>,
 };
 
+export function saveStoreToFile() {
+  if (isUsingMySQL) return;
+  try {
+    if (!fs.existsSync(STORE_DIR)) {
+      fs.mkdirSync(STORE_DIR, { recursive: true });
+    }
+    fs.writeFileSync(STORE_FILE, JSON.stringify(memoryStore, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[Store File Save Error]:', err);
+  }
+}
+
 export async function initDatabase() {
-  // Seed in-memory store
+  // Seed initial values
   const adminPassHash = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'Admin@12345', 10);
   const studentPassHash = await bcrypt.hash('Student@12345', 10);
 
@@ -81,6 +96,17 @@ export async function initDatabase() {
       role: 'student',
       avatar: null,
       phone: '+91 98765 12345',
+      status: 'active',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 3,
+      name: 'Akif (Admin)',
+      email: 'akifq027@gmail.com',
+      password_hash: adminPassHash,
+      role: 'admin',
+      avatar: null,
+      phone: '+91 7989725471',
       status: 'active',
       created_at: new Date().toISOString(),
     },
@@ -126,66 +152,6 @@ export async function initDatabase() {
       download_count: 36,
       status: 'published',
       created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
-    },
-    {
-      id: 22,
-      title: 'NEET Biology High-Yield Revision Charts & Mindmaps',
-      slug: 'neet-biology-high-yield-revision-charts-mindmaps',
-      description: 'Handcrafted summary cheat sheets, memory mnemonics, and one-page classification charts covering essential botanical and zoological NEET high-yield topics. 100% Free for all aspirants.',
-      subject: 'Biology',
-      class_level: 'Class 11 & 12',
-      exam: 'NEET',
-      resource_type: 'Mindmaps',
-      chapter: 'Complete Revision Digest',
-      category_id: 2,
-      price: 0.00,
-      original_price: 149.00,
-      thumbnail: 'https://images.unsplash.com/photo-1576086213369-97a306d36557?w=800&auto=format&fit=crop&q=80',
-      pdf_file: 'Biology_High_Yield_Revision_Charts.pdf',
-      preview_file: null,
-      preview_pages: 3,
-      total_pages: 10,
-      file_size_mb: 1.85,
-      is_free: 1,
-      is_featured: 1,
-      is_bestseller: 1,
-      author_name: 'AIIMS Topper Circle',
-      rating_avg: 4.9,
-      rating_count: 89,
-      purchase_count: 312,
-      download_count: 450,
-      status: 'published',
-      created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
-    },
-    {
-      id: 23,
-      title: 'Physics All-in-One NEET Formula Sheet & Unit Table',
-      slug: 'physics-all-in-one-neet-formula-sheet-unit-table',
-      description: 'Complete high-yield Physics formula booklet with SI units, dimensional analysis, and quick calculation shortcuts for mechanics, electromagnetism, and modern physics. Free download.',
-      subject: 'Physics',
-      class_level: 'Class 12',
-      exam: 'NEET & JEE Main',
-      resource_type: 'Formula Sheet',
-      chapter: 'Essential Formulae & Dimensions',
-      category_id: 4,
-      price: 0.00,
-      original_price: 99.00,
-      thumbnail: 'https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?w=800&auto=format&fit=crop&q=80',
-      pdf_file: 'Physics_Complete_Formula_Sheet.pdf',
-      preview_file: null,
-      preview_pages: 2,
-      total_pages: 8,
-      file_size_mb: 1.42,
-      is_free: 1,
-      is_featured: 1,
-      is_bestseller: 0,
-      author_name: 'NEET Physics Faculty',
-      rating_avg: 4.8,
-      rating_count: 64,
-      purchase_count: 220,
-      download_count: 380,
-      status: 'published',
-      created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
     },
   ];
 
@@ -276,6 +242,87 @@ export async function initDatabase() {
     announcement_bar: '🚀 NCERT NOTES 2026: Use code NCERT20 for 20% OFF on all study materials across Class 8–12 & NEET!',
     currency_symbol: '₹',
   };
+
+  // Attempt to restore persistent store from disk if present
+  try {
+    if (fs.existsSync(STORE_FILE)) {
+      const rawJson = fs.readFileSync(STORE_FILE, 'utf-8');
+      const parsed = JSON.parse(rawJson);
+      if (parsed && typeof parsed === 'object') {
+        if (Array.isArray(parsed.users) && parsed.users.length > 0) memoryStore.users = parsed.users;
+        if (Array.isArray(parsed.categories) && parsed.categories.length > 0) memoryStore.categories = parsed.categories;
+        if (Array.isArray(parsed.notes) && parsed.notes.length > 0) {
+          // Keep user's own uploaded notes, strip out demo notes (22, 23)
+          memoryStore.notes = parsed.notes.filter((n: any) => n.id !== 22 && n.id !== 23);
+        }
+        if (Array.isArray(parsed.orders)) memoryStore.orders = parsed.orders;
+        if (Array.isArray(parsed.order_items)) memoryStore.order_items = parsed.order_items;
+        if (Array.isArray(parsed.downloads)) memoryStore.downloads = parsed.downloads;
+        if (Array.isArray(parsed.reviews)) memoryStore.reviews = parsed.reviews;
+        if (Array.isArray(parsed.coupons)) memoryStore.coupons = parsed.coupons;
+        if (Array.isArray(parsed.contacts)) memoryStore.contacts = parsed.contacts;
+        if (Array.isArray(parsed.refund_requests)) memoryStore.refund_requests = parsed.refund_requests;
+        if (Array.isArray(parsed.wishlist)) memoryStore.wishlist = parsed.wishlist;
+        if (parsed.site_settings) memoryStore.site_settings = { ...memoryStore.site_settings, ...parsed.site_settings };
+        if (parsed.nextIds) memoryStore.nextIds = { ...memoryStore.nextIds, ...parsed.nextIds };
+      }
+    }
+  } catch (storeLoadErr) {
+    console.warn('[Persistent Store] Load error, keeping default seeds:', storeLoadErr);
+  }
+
+  // Ensure user's own uploaded note 21 is present
+  if (!memoryStore.notes.some((n: any) => n.id === 21)) {
+    memoryStore.notes.unshift({
+      id: 21,
+      title: 'Class 11 Biology: Cell - The Unit of Life',
+      slug: 'class-11-biology-cell-the-unit-of-life',
+      description: 'Comprehensive NCERT class 11 biology handwritten study notes covering Cell: The Unit of Life, cell theory, prokaryotic & eukaryotic cell structure, organelle functions, endomembrane system, and high-yield NEET revision diagrams.',
+      subject: 'Biology',
+      class_level: 'Class 11',
+      exam: 'NEET & Boards',
+      resource_type: 'Notes',
+      chapter: 'Cell: The Unit of Life',
+      category_id: 1,
+      price: 1.00,
+      original_price: 99.00,
+      thumbnail: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=80',
+      pdf_file: 'Biology_Notes__Cell___The_Unit_of_Life-1788364226209-967035391.pdf',
+      preview_file: null,
+      preview_pages: 4,
+      total_pages: 12,
+      file_size_mb: 1.14,
+      is_free: 0,
+      is_featured: 1,
+      is_bestseller: 1,
+      author_name: 'NEET Expert Faculty',
+      rating_avg: 5.0,
+      rating_count: 14,
+      purchase_count: 24,
+      download_count: 36,
+      status: 'published',
+      created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+    });
+  }
+
+  // Ensure admin bypass user akifq027@gmail.com is present in memoryStore.users
+  if (!memoryStore.users.some(u => u.email.toLowerCase() === 'akifq027@gmail.com')) {
+    memoryStore.users.push({
+      id: memoryStore.nextIds.users++,
+      name: 'Akif (Admin)',
+      email: 'akifq027@gmail.com',
+      password_hash: adminPassHash,
+      role: 'admin',
+      avatar: null,
+      phone: '+91 7989725471',
+      status: 'active',
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  // Ensure demo notes 22 and 23 are stripped out
+  memoryStore.notes = memoryStore.notes.filter((n: any) => n.id !== 22 && n.id !== 23);
+  saveStoreToFile();
 
   try {
     const isCloudDB = DB_HOST.includes('aivencloud.com') || DB_HOST.includes('amazonaws.com') || process.env.DB_SSL === 'true' || DB_PORT !== 3306;

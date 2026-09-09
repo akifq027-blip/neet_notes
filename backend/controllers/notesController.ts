@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
-import { memoryStore, getPool, isMySQLConnected } from '../config/db';
+import { memoryStore, getPool, isMySQLConnected, saveStoreToFile } from '../config/db';
 import { AuthRequest } from '../middleware/auth';
 import { getOrRenderPdfPages } from '../utils/pdfRenderer';
 
@@ -635,6 +635,7 @@ export async function downloadNote(req: AuthRequest, res: Response) {
         downloaded_at: new Date().toISOString(),
       });
       note.download_count = (note.download_count || 0) + 1;
+      saveStoreToFile();
     }
 
     // File serving: Check if actual physical file exists, or generate high-yield study PDF packet
@@ -953,6 +954,7 @@ export async function toggleWishlist(req: AuthRequest, res: Response) {
         });
         isSaved = true;
       }
+      saveStoreToFile();
     }
 
     return res.json({
