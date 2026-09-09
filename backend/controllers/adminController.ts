@@ -349,6 +349,58 @@ export async function createAdminNote(req: Request, res: Response) {
   }
 }
 
+export async function syncAdminNotes(req: Request, res: Response) {
+  try {
+    const { notes } = req.body;
+    if (!Array.isArray(notes) || notes.length === 0) {
+      return res.json({ success: true, message: 'No notes to sync.', notes: memoryStore.notes });
+    }
+
+    let syncedCount = 0;
+    for (const incoming of notes) {
+      if (!incoming.title) continue;
+      const existingIdx = memoryStore.notes.findIndex(
+        n => Number(n.id) === Number(incoming.id) || n.title.trim().toLowerCase() === incoming.title.trim().toLowerCase()
+      );
+
+      if (existingIdx >= 0) {
+        memoryStore.notes[existingIdx] = {
+          ...memoryStore.notes[existingIdx],
+          ...incoming,
+          id: memoryStore.notes[existingIdx].id,
+          status: incoming.status || 'published',
+        };
+      } else {
+        const maxExistingId = memoryStore.notes.reduce((max, n) => Math.max(max, Number(n.id) || 0), 20);
+        const newId = incoming.id && !memoryStore.notes.some(n => Number(n.id) === Number(incoming.id))
+          ? Number(incoming.id)
+          : maxExistingId + 1;
+
+        memoryStore.notes.unshift({
+          ...incoming,
+          id: newId,
+          status: incoming.status || 'published',
+          created_at: incoming.created_at || new Date().toISOString(),
+        });
+        syncedCount++;
+      }
+    }
+
+    saveStoreToFile();
+    console.log(`[Admin] Synced ${syncedCount} client-side notes to server store. Total notes: ${memoryStore.notes.length}`);
+
+    return res.json({
+      success: true,
+      message: `Successfully synchronized ${syncedCount} study notes to server!`,
+      syncedCount,
+      notes: memoryStore.notes,
+    });
+  } catch (error: any) {
+    console.error('[Sync Notes Error]', error);
+    return res.status(500).json({ success: false, message: 'Failed to sync notes to server.' });
+  }
+}
+
 export async function updateAdminNote(req: Request, res: Response) {
   try {
     const noteId = parseInt(req.params.id, 10);
