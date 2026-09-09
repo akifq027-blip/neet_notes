@@ -265,7 +265,9 @@ export const PreviewReaderModal: React.FC<PreviewReaderModalProps> = ({
               <button
                 id="preview-unlock-btn"
                 onClick={() => {
-                  if (onBuyNow) {
+                  if (note.is_free) {
+                    api.downloadNoteFile(note);
+                  } else if (onBuyNow) {
                     onBuyNow(note);
                   } else {
                     onAddToCart(note);

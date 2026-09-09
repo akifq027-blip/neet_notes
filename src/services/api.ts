@@ -692,6 +692,35 @@ export const api = {
     return `${API_BASE}/notes/${noteId}/download?token=${encodeURIComponent(token)}`;
   },
 
+  downloadNoteFile(note: { id: number; title: string; slug?: string; is_free?: boolean | number }): void {
+    // 1. Immediately unlock in user's local library store
+    const existing = getLocalLibraryIds();
+    if (!existing.includes(note.id)) {
+      saveLocalLibraryIds([...existing, note.id]);
+      window.dispatchEvent(new CustomEvent('neet_notes_updated'));
+    }
+
+    const downloadUrl = this.getDownloadUrl(note.id);
+    
+    // 2. Trigger download
+    try {
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.setAttribute('download', `${note.slug || 'neet-notes'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+        }
+      }, 300);
+    } catch {
+      window.open(downloadUrl, '_blank');
+    }
+  },
+
   // Secure In-App Notes Reader Content
   async getSecureReaderContent(noteId: number): Promise<{ success: boolean; note?: any; license?: any; pages?: any[]; message?: string }> {
     const result = await safeFetch(`${API_BASE}/notes/${noteId}/reader-content`, {

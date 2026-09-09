@@ -340,6 +340,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
+  const handleClaimFreeOrder = () => {
+    items.forEach((it) => {
+      api.downloadNoteFile(it.note);
+    });
+    setCompletedOrder({
+      orderId: 0,
+      orderNumber: `FREE-${Date.now().toString().slice(-6)}`,
+      amount: 0,
+      purchasedNotes: items.map((i) => i.note),
+      isInstantAccess: true,
+    });
+    onSuccess(0);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -844,7 +858,28 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     </div>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="p-5 bg-emerald-50/80 border border-emerald-200 rounded-2xl text-center space-y-3">
+                  <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto shadow-xs">
+                    <Download className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900">100% Free Study Resources</h4>
+                    <p className="text-xs text-slate-600 mt-1">
+                      No payment or UPI verification needed! Click below to download immediately and save to your Student Library.
+                    </p>
+                  </div>
+                  <button
+                    id="claim-free-checkout-btn"
+                    type="button"
+                    onClick={handleClaimFreeOrder}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Free Notes & Add to Library</span>
+                  </button>
+                </div>
+              )}
 
               {statusNotice && (
                 <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs rounded-xl font-semibold flex items-center gap-2 animate-in fade-in">

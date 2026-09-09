@@ -168,8 +168,17 @@ export function App() {
     }
   };
 
+  // Free Download Handler
+  const handleDownloadFree = (note: Note) => {
+    api.downloadNoteFile(note);
+  };
+
   // Cart Handlers
   const handleAddToCart = (note: Note) => {
+    if (note.is_free) {
+      handleDownloadFree(note);
+      return;
+    }
     setCartItems((prev) => {
       const exists = prev.find((item) => item.note.id === note.id);
       if (exists) return prev;
@@ -179,6 +188,10 @@ export function App() {
   };
 
   const handleBuyNow = (note: Note) => {
+    if (note.is_free) {
+      handleDownloadFree(note);
+      return;
+    }
     setCartItems((prev) => {
       const exists = prev.find((item) => item.note.id === note.id);
       if (exists) return prev;
@@ -453,6 +466,7 @@ export function App() {
                     onPreview={(n) => setPreviewNote(n)}
                     onAddToCart={(n) => handleAddToCart(n)}
                     onBuyNow={(n) => handleBuyNow(n)}
+                    onDownloadFree={handleDownloadFree}
                     onOpenDetail={(id) => setDetailNoteId(id)}
                     onToggleWishlist={handleToggleWishlist}
                     isWishlisted={wishlistIds.includes(note.id)}
@@ -664,6 +678,7 @@ export function App() {
                     onPreview={(n) => setPreviewNote(n)}
                     onAddToCart={(n) => handleAddToCart(n)}
                     onBuyNow={(n) => handleBuyNow(n)}
+                    onDownloadFree={handleDownloadFree}
                     onOpenDetail={(id) => setDetailNoteId(id)}
                     onToggleWishlist={handleToggleWishlist}
                     isWishlisted={wishlistIds.includes(note.id)}

@@ -89,12 +89,12 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
   if (!isOpen || !noteId) return null;
 
   const handleDownload = () => {
-    if (!user) {
-      onOpenAuth();
-      return;
+    if (noteData) {
+      api.downloadNoteFile(noteData);
+    } else {
+      const downloadUrl = api.getDownloadUrl(noteId);
+      window.open(downloadUrl, '_blank');
     }
-    const downloadUrl = api.getDownloadUrl(noteId);
-    window.open(downloadUrl, '_blank');
   };
 
   const handleSubmitReview = async (e: React.FormEvent) => {
@@ -278,7 +278,7 @@ export const NoteDetailModal: React.FC<NoteDetailModalProps> = ({
                     ) : noteData.is_free ? (
                       <button
                         id="detail-claim-free-btn"
-                        onClick={() => onAddToCart(noteData)}
+                        onClick={handleDownload}
                         className="col-span-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <Download className="w-4 h-4" />

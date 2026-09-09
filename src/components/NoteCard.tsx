@@ -1,6 +1,7 @@
 import React from 'react';
 import { Star, FileText, Download, ShoppingCart, Eye, Heart, Check, Sparkles } from 'lucide-react';
 import { Note } from '../types';
+import { api } from '../services/api';
 
 interface NoteCardProps {
   note: Note;
@@ -8,6 +9,7 @@ interface NoteCardProps {
   onPreview: (note: Note) => void;
   onAddToCart: (note: Note) => void;
   onBuyNow?: (note: Note) => void;
+  onDownloadFree?: (note: Note) => void;
   onOpenDetail?: (noteId: number) => void;
   onToggleWishlist?: (noteId: number) => void;
   isInCart?: boolean;
@@ -21,6 +23,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
   onPreview,
   onAddToCart,
   onBuyNow,
+  onDownloadFree,
   onOpenDetail,
   onToggleWishlist,
   isInCart = false,
@@ -195,9 +198,14 @@ export const NoteCard: React.FC<NoteCardProps> = ({
               id={`get-free-btn-${note.id}`}
               onClick={(e) => {
                 e.stopPropagation();
-                onAddToCart(note);
+                if (onDownloadFree) {
+                  onDownloadFree(note);
+                } else {
+                  api.downloadNoteFile(note);
+                }
               }}
-              className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3.5 py-2 sm:py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 min-h-[36px] shadow-sm shadow-teal-600/20"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 sm:py-1.5 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 min-h-[36px] shadow-sm shadow-emerald-600/20"
+              title="Download Free PDF"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download</span>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Trash2, ShoppingBag, ArrowRight, Tag, Check, Sparkles, ShieldCheck } from 'lucide-react';
+import { X, Trash2, ShoppingBag, ArrowRight, Tag, Check, Sparkles, ShieldCheck, Download } from 'lucide-react';
 import { CartItem } from '../types';
 import { api } from '../services/api';
 
@@ -257,6 +257,15 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   e.preventDefault();
                   e.stopPropagation();
                   if (isSubmittingCheckout) return;
+                  if (finalTotal === 0) {
+                    // All items are free: download them directly & clear cart
+                    cartItems.forEach((item) => {
+                      api.downloadNoteFile(item.note);
+                    });
+                    onClearCart();
+                    onClose();
+                    return;
+                  }
                   setIsSubmittingCheckout(true);
                   onProceedToCheckout(appliedCoupon);
                   setTimeout(() => {
@@ -269,6 +278,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>Opening Checkout...</span>
+                  </>
+                ) : finalTotal === 0 ? (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>Download Free Notes Directly</span>
                   </>
                 ) : (
                   <>

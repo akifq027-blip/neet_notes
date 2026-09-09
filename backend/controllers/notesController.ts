@@ -542,13 +542,6 @@ export async function getNoteById(req: AuthRequest, res: Response) {
 // SECURE DOWNLOAD HANDLER
 export async function downloadNote(req: AuthRequest, res: Response) {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'You must be logged in to download study notes.',
-      });
-    }
-
     const noteId = parseInt(req.params.id, 10);
     if (!noteId) {
       return res.status(400).json({ success: false, message: 'Invalid note ID.' });
@@ -563,7 +556,7 @@ export async function downloadNote(req: AuthRequest, res: Response) {
         if (nRows.length > 0) note = nRows[0];
       }
     } else {
-      note = memoryStore.notes.find(n => n.id === noteId);
+      note = memoryStore.notes.find(n => Number(n.id) === Number(noteId));
     }
 
     if (!note) {
@@ -572,59 +565,69 @@ export async function downloadNote(req: AuthRequest, res: Response) {
 
     // Free Note access
     const isFree = Boolean(note.is_free);
-
-    // If note is paid, verify ownership in database
-    let isAuthorized = isFree || req.user.role === 'admin';
     let orderId: number | null = null;
 
-    if (!isAuthorized) {
-      if (isMySQLConnected()) {
-        const pool = getPool();
-        if (pool) {
-          const [oRows]: any = await pool.query(
-            'SELECT o.id FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND oi.note_id = ? AND o.payment_status IN ("paid", "pending_verification")',
-            [req.user.id, noteId]
-          );
-          if (oRows.length > 0) {
+    // If note is paid, verify authentication and ownership
+    if (!isFree) {
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'You must be logged in to download premium study notes.',
+        });
+      }
+
+      let isAuthorized = req.user.role === 'admin';
+
+      if (!isAuthorized) {
+        if (isMySQLConnected()) {
+          const pool = getPool();
+          if (pool) {
+            const [oRows]: any = await pool.query(
+              'SELECT o.id FROM order_items oi JOIN orders o ON oi.order_id = o.id WHERE o.user_id = ? AND oi.note_id = ? AND o.payment_status IN ("paid", "pending_verification")',
+              [req.user.id, noteId]
+            );
+            if (oRows.length > 0) {
+              isAuthorized = true;
+              orderId = oRows[0].id;
+            }
+          }
+        } else {
+          const paidOrders = memoryStore.orders.filter(o => o.user_id === req.user?.id && (o.payment_status === 'paid' || o.payment_status === 'pending_verification'));
+          const paidOrderIds = paidOrders.map(o => o.id);
+          const item = memoryStore.order_items.find(oi => paidOrderIds.includes(oi.order_id) && Number(oi.note_id) === Number(noteId));
+          if (item) {
             isAuthorized = true;
-            orderId = oRows[0].id;
+            orderId = item.order_id;
           }
         }
-      } else {
-        const paidOrders = memoryStore.orders.filter(o => o.user_id === req.user?.id && (o.payment_status === 'paid' || o.payment_status === 'pending_verification'));
-        const paidOrderIds = paidOrders.map(o => o.id);
-        const item = memoryStore.order_items.find(oi => paidOrderIds.includes(oi.order_id) && Number(oi.note_id) === Number(noteId));
-        if (item) {
-          isAuthorized = true;
-          orderId = item.order_id;
-        }
       }
-    }
 
-    if (!isAuthorized) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access Denied: You have not purchased this premium note yet. Please complete checkout to unlock your download.',
-      });
+      if (!isAuthorized) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access Denied: You have not purchased this premium note yet. Please complete checkout to unlock your download.',
+        });
+      }
     }
 
     // Log the download for telemetry & security
     const ip = req.ip || req.socket.remoteAddress || '127.0.0.1';
     const userAgent = req.headers['user-agent'] || 'Unknown';
+    const userId = req.user ? req.user.id : 0;
 
     if (isMySQLConnected()) {
       const pool = getPool();
       if (pool) {
         await pool.query(
           'INSERT INTO downloads (user_id, note_id, order_id, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)',
-          [req.user.id, noteId, orderId, ip, userAgent]
+          [userId, noteId, orderId, ip, userAgent]
         );
         await pool.query('UPDATE notes SET download_count = download_count + 1 WHERE id = ?', [noteId]);
       }
     } else {
       memoryStore.downloads.push({
         id: memoryStore.nextIds.downloads++,
-        user_id: req.user.id,
+        user_id: userId,
         note_id: noteId,
         order_id: orderId,
         ip_address: ip,
@@ -1045,6 +1048,9 @@ export async function getCategories(req: Request, res: Response) {
 }
 
 function generateSyntheticStudyPDF(note: any, user: any): string {
+  const userName = user?.name || 'NEET Aspirant';
+  const userEmail = user?.email || 'Free Study Access';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1076,7 +1082,7 @@ function generateSyntheticStudyPDF(note: any, user: any): string {
     </div>
 
     <div class="content-box">
-      <strong>License & Verification:</strong> Licensed exclusively to <strong>${user.name} (${user.email})</strong>. Authorized for individual NEET entrance exam preparation.
+      <strong>License & Verification:</strong> Licensed exclusively to <strong>${userName} (${userEmail})</strong>. Authorized for individual NEET entrance exam preparation.
     </div>
 
     <div class="section-title">1. High-Yield Chapter Highlights</div>
@@ -1096,7 +1102,7 @@ function generateSyntheticStudyPDF(note: any, user: any): string {
     </ul>
 
     <div class="watermark">
-      Generated by NEET Notes Marketplace &copy; 2026. All rights reserved. User ID: ${user.id} | Timestamp: ${new Date().toLocaleString()}
+      Generated by NEET Notes Marketplace &copy; 2026. All rights reserved. User ID: ${user?.id || 'Guest/Free'} | Timestamp: ${new Date().toLocaleString()}
     </div>
   </div>
 </body>
